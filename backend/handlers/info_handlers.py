@@ -57,7 +57,7 @@ async def play_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.effective_message.reply_text(
         text,
         reply_markup=inline_keyboard if inline_keyboard else main_menu_keyboard(),
-        parse_mode="MarkdownV2",
+        parse_mode="HTML",
     )
 
     # Always send main menu keyboard if we sent an inline keyboard
@@ -65,7 +65,7 @@ async def play_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.effective_message.reply_text(
             "Use the menu below for other actions\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
 
@@ -83,7 +83,7 @@ async def instruction_handler(
     await update.effective_message.reply_text(
         INSTRUCTION_MESSAGE,
         reply_markup=main_menu_keyboard(),
-        parse_mode="MarkdownV2",
+        parse_mode="HTML",
     )
 
 
@@ -101,6 +101,6 @@ async def support_handler(
     await update.effective_message.reply_text(
         support_message(),
         reply_markup=main_menu_keyboard(),
-        parse_mode="MarkdownV2",
+        parse_mode="HTML",
         disable_web_page_preview=True,
     )

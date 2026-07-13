@@ -21,7 +21,7 @@ from backend.bot.messages import (
     DEPOSIT_PROMPT_MESSAGE,
     MUST_REGISTER_FIRST,
     deposit_instructions,
-    escape_md,
+    escape_html,
 )
 from backend.core.logging import get_logger
 from backend.database.session import get_session_factory
@@ -55,7 +55,7 @@ async def deposit_button_handler(
             await update.effective_message.reply_text(
                 MUST_REGISTER_FIRST,
                 reply_markup=main_menu_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
             return
 
@@ -63,7 +63,7 @@ async def deposit_button_handler(
         await update.effective_message.reply_text(
             DEPOSIT_PROMPT_MESSAGE,
             reply_markup=cancel_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
     except Exception:
@@ -71,7 +71,7 @@ async def deposit_button_handler(
         await update.effective_message.reply_text(
             "⚠️ An error occurred\\. Please try again\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
 
@@ -90,7 +90,7 @@ async def deposit_amount_handler(
         await update.effective_message.reply_text(
             DEPOSIT_INVALID_AMOUNT_MESSAGE,
             reply_markup=cancel_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
         return
 
@@ -102,7 +102,7 @@ async def deposit_amount_handler(
         await update.effective_message.reply_text(
             deposit_instructions(amount),
             reply_markup=cancel_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
     except Exception:
@@ -111,7 +111,7 @@ async def deposit_amount_handler(
         await update.effective_message.reply_text(
             "⚠️ An error occurred\\. Please try again\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
 
@@ -134,14 +134,14 @@ async def deposit_sms_handler(
             await update.effective_message.reply_text(
                 "⚠️ Session expired\\. Please start the deposit process again\\.",
                 reply_markup=main_menu_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
             return
 
         # Send a "processing" indicator
         processing_msg = await update.effective_message.reply_text(
             "⏳ Processing your payment confirmation\\.\\.\\.",
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
         factory = get_session_factory()
@@ -171,7 +171,7 @@ async def deposit_sms_handler(
         await update.effective_message.reply_text(
             result.message,
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
         logger.info(
@@ -187,5 +187,5 @@ async def deposit_sms_handler(
         await update.effective_message.reply_text(
             "⚠️ An error occurred while processing your payment\\. Please try again or contact support\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )

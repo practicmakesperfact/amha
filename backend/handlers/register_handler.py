@@ -12,7 +12,7 @@ from backend.bot.messages import (
     REGISTER_FAILED_MESSAGE,
     REGISTER_PROMPT_MESSAGE,
     REGISTER_SUCCESS_MESSAGE,
-    escape_md,
+    escape_html,
 )
 from backend.core.logging import get_logger
 from backend.database.session import get_session_factory
@@ -46,7 +46,7 @@ async def register_button_handler(
             await update.effective_message.reply_text(
                 ALREADY_REGISTERED_MESSAGE,
                 reply_markup=main_menu_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
             return
 
@@ -55,14 +55,14 @@ async def register_button_handler(
         await update.effective_message.reply_text(
             REGISTER_PROMPT_MESSAGE,
             reply_markup=share_contact_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
     except Exception:
         logger.exception("Error in register_button_handler", telegram_id=tg_user.id)
         await update.effective_message.reply_text(
             "⚠️ An error occurred\\. Please try again\\.",
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
 
@@ -79,7 +79,7 @@ async def contact_handler(
     if contact is None:
         await update.effective_message.reply_text(
             "❌ No contact received\\. Please use the *Share Contact* button\\.",
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
         return
 
@@ -131,13 +131,13 @@ async def contact_handler(
             await update.effective_message.reply_text(
                 REGISTER_SUCCESS_MESSAGE,
                 reply_markup=main_menu_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
         else:
             await update.effective_message.reply_text(
                 REGISTER_FAILED_MESSAGE,
                 reply_markup=main_menu_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
 
     except Exception:
@@ -146,5 +146,5 @@ async def contact_handler(
         await update.effective_message.reply_text(
             "⚠️ Registration failed\\. Please try again\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )

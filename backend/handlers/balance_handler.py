@@ -37,7 +37,7 @@ async def balance_handler(
             await update.effective_message.reply_text(
                 NOT_REGISTERED_BALANCE,
                 reply_markup=main_menu_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
             return
 
@@ -55,7 +55,7 @@ async def balance_handler(
         await update.effective_message.reply_text(
             msg,
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
     except Exception:
@@ -63,5 +63,5 @@ async def balance_handler(
         await update.effective_message.reply_text(
             "⚠️ Could not fetch balance\\. Please try again\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )

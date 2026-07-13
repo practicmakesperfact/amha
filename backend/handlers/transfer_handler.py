@@ -19,7 +19,7 @@ from backend.bot.messages import (
     MUST_REGISTER_FIRST,
     TRANSFER_PROMPT_AMOUNT,
     TRANSFER_PROMPT_RECIPIENT,
-    escape_md,
+    escape_html,
     admin_transfer_notification,
 )
 from backend.core.config import settings
@@ -58,7 +58,7 @@ async def _notify_admins_transfer(
                 chat_id=admin_id,
                 text=text,
                 reply_markup=keyboard,
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
         except Exception:
             logger.warning("Failed to notify admin of transfer", admin_id=admin_id)
@@ -85,7 +85,7 @@ async def transfer_button_handler(
             await update.effective_message.reply_text(
                 MUST_REGISTER_FIRST,
                 reply_markup=main_menu_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
             return
 
@@ -93,7 +93,7 @@ async def transfer_button_handler(
         await update.effective_message.reply_text(
             TRANSFER_PROMPT_RECIPIENT,
             reply_markup=cancel_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
     except Exception:
@@ -101,7 +101,7 @@ async def transfer_button_handler(
         await update.effective_message.reply_text(
             "⚠️ An error occurred\\. Please try again\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
 
@@ -123,9 +123,9 @@ async def transfer_recipient_handler(
 
         if recipient is None:
             await update.effective_message.reply_text(
-                f"❌ User *{escape_md(identifier)}* not found\\.\n\nPlease enter a valid @username or phone number\\.",
+                f"❌ User *{escape_html(identifier)}* not found\\.\n\nPlease enter a valid @username or phone number\\.",
                 reply_markup=cancel_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
             return
 
@@ -133,7 +133,7 @@ async def transfer_recipient_handler(
             await update.effective_message.reply_text(
                 "❌ Recipient is not a registered user\\.",
                 reply_markup=cancel_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
             return
 
@@ -146,7 +146,7 @@ async def transfer_recipient_handler(
         await update.effective_message.reply_text(
             TRANSFER_PROMPT_AMOUNT,
             reply_markup=cancel_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
     except Exception:
@@ -155,7 +155,7 @@ async def transfer_recipient_handler(
         await update.effective_message.reply_text(
             "⚠️ An error occurred\\. Please try again\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
 
@@ -174,7 +174,7 @@ async def transfer_amount_handler(
         await update.effective_message.reply_text(
             "❌ Invalid amount\\. Please enter a positive number\\.",
             reply_markup=cancel_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
         return
 
@@ -188,7 +188,7 @@ async def transfer_amount_handler(
             await update.effective_message.reply_text(
                 "⚠️ Session expired\\. Please start again\\.",
                 reply_markup=main_menu_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
             return
 
@@ -215,7 +215,7 @@ async def transfer_amount_handler(
                     await update.effective_message.reply_text(
                         f"❌ Insufficient balance\\.\nYour Main Wallet: *{sender.main_wallet:.2f} ETB*",
                         reply_markup=main_menu_keyboard(),
-                        parse_mode="MarkdownV2",
+                        parse_mode="HTML",
                     )
                     return
 
@@ -235,11 +235,11 @@ async def transfer_amount_handler(
             (
                 "✅ *Transfer request submitted\\!*\n\n"
                 f"Amount: *{amount:.2f} ETB*\n"
-                f"To: *{escape_md(receiver_name)}*\n\n"
+                f"To: *{escape_html(receiver_name)}*\n\n"
                 "An administrator will process your request shortly\\."
             ),
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
         await _notify_admins_transfer(
@@ -258,5 +258,5 @@ async def transfer_amount_handler(
         await update.effective_message.reply_text(
             "⚠️ An error occurred\\. Please try again or contact support\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )

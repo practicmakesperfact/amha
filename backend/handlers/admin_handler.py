@@ -96,13 +96,13 @@ async def _handle_deposit_action(action, deposit_id, admin_id, query, context, f
                                     f"✅ *Deposit Approved\\!*\n\n"
                                     f"`{deposit.amount:.2f} ETB` has been added to your Main Wallet\\."
                                 ),
-                                parse_mode="MarkdownV2",
+                                parse_mode="HTML",
                             )
                         except Exception:
                             logger.warning("Failed to notify user of deposit approval", user_id=user.id)
                     await query.edit_message_text(
                         f"✅ Deposit #{deposit_id} approved by admin {admin_id}\\.",
-                        parse_mode="MarkdownV2",
+                        parse_mode="HTML",
                     )
             elif action == "reject":
                 deposit = await service.admin_reject(deposit_id, admin_id)
@@ -114,13 +114,13 @@ async def _handle_deposit_action(action, deposit_id, admin_id, query, context, f
                             await context.bot.send_message(
                                 chat_id=user.chat_id,
                                 text="❌ *Deposit Rejected*\n\nYour deposit request has been rejected\\. Please contact support\\.",
-                                parse_mode="MarkdownV2",
+                                parse_mode="HTML",
                             )
                         except Exception:
                             pass
                     await query.edit_message_text(
                         f"❌ Deposit #{deposit_id} rejected\\.",
-                        parse_mode="MarkdownV2",
+                        parse_mode="HTML",
                     )
 
 
@@ -141,13 +141,13 @@ async def _handle_withdrawal_action(action, withdrawal_id, admin_id, query, cont
                                     f"✅ *Withdrawal Approved\\!*\n\n"
                                     f"`{w.amount:.2f} ETB` will be sent to `{w.telebirr_number}` shortly\\."
                                 ),
-                                parse_mode="MarkdownV2",
+                                parse_mode="HTML",
                             )
                         except Exception:
                             pass
                     await query.edit_message_text(
                         f"✅ Withdrawal #{withdrawal_id} approved\\.",
-                        parse_mode="MarkdownV2",
+                        parse_mode="HTML",
                     )
             elif action == "reject":
                 w = await service.admin_reject(withdrawal_id, admin_id)
@@ -159,13 +159,13 @@ async def _handle_withdrawal_action(action, withdrawal_id, admin_id, query, cont
                             await context.bot.send_message(
                                 chat_id=user.chat_id,
                                 text="❌ *Withdrawal Rejected*\n\nYour withdrawal request has been rejected\\. Please contact support\\.",
-                                parse_mode="MarkdownV2",
+                                parse_mode="HTML",
                             )
                         except Exception:
                             pass
                     await query.edit_message_text(
                         f"❌ Withdrawal #{withdrawal_id} rejected\\.",
-                        parse_mode="MarkdownV2",
+                        parse_mode="HTML",
                     )
 
 
@@ -184,7 +184,7 @@ async def _handle_transfer_action(action, transfer_id, admin_id, query, context,
                             await context.bot.send_message(
                                 chat_id=sender.chat_id,
                                 text=f"✅ *Transfer Approved\\!*\n\n`{t.amount:.2f} ETB` has been sent\\.",
-                                parse_mode="MarkdownV2",
+                                parse_mode="HTML",
                             )
                         except Exception:
                             pass
@@ -193,13 +193,13 @@ async def _handle_transfer_action(action, transfer_id, admin_id, query, context,
                             await context.bot.send_message(
                                 chat_id=receiver.chat_id,
                                 text=f"🎁 *You received a transfer\\!*\n\n`{t.amount:.2f} ETB` has been added to your wallet\\.",
-                                parse_mode="MarkdownV2",
+                                parse_mode="HTML",
                             )
                         except Exception:
                             pass
                     await query.edit_message_text(
                         f"✅ Transfer #{transfer_id} approved\\.",
-                        parse_mode="MarkdownV2",
+                        parse_mode="HTML",
                     )
             elif action == "reject":
                 t = await service.admin_reject(transfer_id, admin_id)
@@ -211,11 +211,11 @@ async def _handle_transfer_action(action, transfer_id, admin_id, query, context,
                             await context.bot.send_message(
                                 chat_id=sender.chat_id,
                                 text="❌ *Transfer Rejected*\n\nYour transfer request has been rejected\\.",
-                                parse_mode="MarkdownV2",
+                                parse_mode="HTML",
                             )
                         except Exception:
                             pass
                     await query.edit_message_text(
                         f"❌ Transfer #{transfer_id} rejected\\.",
-                        parse_mode="MarkdownV2",
+                        parse_mode="HTML",
                     )

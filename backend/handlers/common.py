@@ -20,7 +20,7 @@ async def send_main_menu(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     text: str = "🏠 Main Menu",
-    parse_mode: str = "MarkdownV2",
+    parse_mode: str = "HTML",
 ) -> None:
     """Send a message with the persistent main menu keyboard."""
     await update.effective_message.reply_text(
@@ -40,8 +40,8 @@ async def check_rate_limit(update: Update) -> bool:
     limited = await is_rate_limited(update.effective_user.id)
     if limited:
         await update.effective_message.reply_text(
-            "⚠️ You are sending messages too fast\\. Please slow down\\.",
-            parse_mode="MarkdownV2",
+            "⚠️ You are sending messages too fast. Please slow down.",
+            parse_mode="HTML",
         )
     return limited
 

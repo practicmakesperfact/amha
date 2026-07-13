@@ -21,7 +21,7 @@ from backend.bot.messages import (
     WITHDRAWAL_INVALID_PHONE,
     WITHDRAWAL_PROMPT_AMOUNT,
     WITHDRAWAL_PROMPT_PHONE,
-    escape_md,
+    escape_html,
 )
 from backend.core.config import settings
 from backend.core.logging import get_logger
@@ -61,7 +61,7 @@ async def _notify_admins_withdrawal(
                 chat_id=admin_id,
                 text=text,
                 reply_markup=keyboard,
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
         except Exception:
             logger.warning("Failed to notify admin", admin_id=admin_id, withdrawal_id=withdrawal_id)
@@ -88,7 +88,7 @@ async def withdraw_button_handler(
             await update.effective_message.reply_text(
                 MUST_REGISTER_FIRST,
                 reply_markup=main_menu_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
             return
 
@@ -96,7 +96,7 @@ async def withdraw_button_handler(
         await update.effective_message.reply_text(
             WITHDRAWAL_PROMPT_PHONE,
             reply_markup=cancel_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
     except Exception:
@@ -104,7 +104,7 @@ async def withdraw_button_handler(
         await update.effective_message.reply_text(
             "⚠️ An error occurred\\. Please try again\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
 
@@ -122,7 +122,7 @@ async def withdrawal_phone_handler(
         await update.effective_message.reply_text(
             WITHDRAWAL_INVALID_PHONE,
             reply_markup=cancel_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
         return
 
@@ -132,7 +132,7 @@ async def withdrawal_phone_handler(
         await update.effective_message.reply_text(
             WITHDRAWAL_PROMPT_AMOUNT,
             reply_markup=cancel_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
     except Exception:
         logger.exception("Error in withdrawal_phone_handler", telegram_id=tg_user.id)
@@ -140,7 +140,7 @@ async def withdrawal_phone_handler(
         await update.effective_message.reply_text(
             "⚠️ An error occurred\\. Please try again\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
 
@@ -159,7 +159,7 @@ async def withdrawal_amount_handler(
         await update.effective_message.reply_text(
             "❌ Invalid amount\\. Please enter a positive number\\.",
             reply_markup=cancel_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
         return
 
@@ -172,7 +172,7 @@ async def withdrawal_amount_handler(
             await update.effective_message.reply_text(
                 "⚠️ Session expired\\. Please start again\\.",
                 reply_markup=main_menu_keyboard(),
-                parse_mode="MarkdownV2",
+                parse_mode="HTML",
             )
             return
 
@@ -197,7 +197,7 @@ async def withdrawal_amount_handler(
         await update.effective_message.reply_text(
             result.message,
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
         # Notify admins if request was created successfully
@@ -218,5 +218,5 @@ async def withdrawal_amount_handler(
         await update.effective_message.reply_text(
             "⚠️ An error occurred\\. Please try again or contact support\\.",
             reply_markup=main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )

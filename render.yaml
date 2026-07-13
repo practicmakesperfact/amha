@@ -1,0 +1,34 @@
+services:
+  - type: worker
+    name: amhabingo-bot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m backend.run_polling
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false   # You will set this manually in Render dashboard
+      - key: DATABASE_URL
+        sync: false   # You will set this manually in Render dashboard
+      - key: REDIS_URL
+        value: memory://
+      - key: ADMIN_TELEGRAM_IDS
+        sync: false   # You will set this manually in Render dashboard
+      - key: TELEBIRR_RECEIVER_NUMBER
+        value: "0909425014"
+      - key: SUPPORT_CHANNEL_URL
+        value: "https://t.me/amhabingosupport_team"
+      - key: BOT_USERNAME
+        value: "amhabingo_bot"
+      - key: MIN_DEPOSIT_AMOUNT
+        value: "10.0"
+      - key: MIN_WITHDRAWAL_AMOUNT
+        value: "50.0"
+      - key: MIN_TRANSFER_AMOUNT
+        value: "10.0"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: ENVIRONMENT
+        value: "production"
+      - key: DEBUG
+        value: "false"

@@ -65,12 +65,12 @@ async def start_handler(
             reply_markup=__import__(
                 "backend.keyboards.keyboards", fromlist=["main_menu_keyboard"]
             ).main_menu_keyboard(),
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
 
     except Exception:
         logger.exception("Error in start_handler", telegram_id=tg_user.id)
         await update.effective_message.reply_text(
             "⚠️ An error occurred\\. Please try again later\\.",
-            parse_mode="MarkdownV2",
+            parse_mode="HTML",
         )
