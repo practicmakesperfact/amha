@@ -1,7 +1,3 @@
-"""
-ORM models for AMHABINGO Bot.
-All models use SQLAlchemy 2 Mapped types with full type hints.
-"""
 
 from __future__ import annotations
 
@@ -59,7 +55,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False, index=True)
     chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    username: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
+    username: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     first_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     last_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     full_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
@@ -119,7 +115,7 @@ class Deposit(Base):
     reference: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
     transaction_date: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     status: Mapped[DepositStatus] = mapped_column(
-        Enum(DepositStatus), default=DepositStatus.PENDING, nullable=False, index=True
+        Enum(DepositStatus), default=DepositStatus.PENDING, nullable=False
     )
     admin_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     approved_by: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
@@ -153,7 +149,7 @@ class Withdrawal(Base):
     telebirr_number: Mapped[str] = mapped_column(String(20), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     status: Mapped[WithdrawalStatus] = mapped_column(
-        Enum(WithdrawalStatus), default=WithdrawalStatus.PENDING, nullable=False, index=True
+        Enum(WithdrawalStatus), default=WithdrawalStatus.PENDING, nullable=False
     )
     admin_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     approved_by: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
@@ -189,7 +185,7 @@ class Transfer(Base):
     )
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     status: Mapped[TransferStatus] = mapped_column(
-        Enum(TransferStatus), default=TransferStatus.PENDING, nullable=False, index=True
+        Enum(TransferStatus), default=TransferStatus.PENDING, nullable=False
     )
     admin_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     approved_by: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
@@ -225,10 +221,10 @@ class UsedSMS(Base):
     __table_args__ = (UniqueConstraint("reference_number", name="uq_used_sms_reference"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    reference_number: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    reference_number: Mapped[str] = mapped_column(String(128), nullable=False)
     sms_hash: Mapped[str] = mapped_column(String(64), nullable=False)  # SHA-256 of raw SMS text
     deposit_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("deposits.id", ondelete="SET NULL"), nullable=True
+        Integer, ForeignKey("deposits.id", ondelete="SET NULL"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

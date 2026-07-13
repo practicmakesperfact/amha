@@ -87,7 +87,10 @@ class TestServices(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(deposit.amount, 150.00)
 
         # Process a valid SMS for the deposit
-        sms_text = "Transaction of Birr 150.00 from 0911223344 to 0909425014 completed. Ref No. TXN100200 at 12/07/2026."
+        from datetime import datetime, timezone, timedelta
+        EAT = timezone(timedelta(hours=3))
+        now_str = datetime.now(EAT).strftime("%d/%m/%Y %H:%M:%S")
+        sms_text = f"Transaction of Birr 150.00 from 0911223344 to 0909425014 completed. Ref No. TXN100200 at {now_str}."
         result = await deposit_service.process_sms_deposit(
             user_id=user.id,
             expected_amount=150.00,
@@ -193,6 +196,42 @@ class TestServices(unittest.IsolatedAsyncioTestCase):
         receiver_db = await user_service.get_by_id(receiver.id)
         self.assertEqual(sender_db.main_wallet, 250.00)
         self.assertEqual(receiver_db.main_wallet, 50.00)
+
+    async def test_deposit_time_validation(self):
+        user_service = UserService(self.session)
+        deposit_service = DepositService(self.session)
+
+        # Create and register user
+        user, _ = await user_service.get_or_create_from_telegram(
+            telegram_id=66666, chat_id=66666, username="time_user", first_name="Time", last_name="User"
+        )
+        await user_service.register_user(telegram_id=66666, phone_number="0911223348")
+
+        from datetime import datetime, timezone, timedelta
+        EAT = timezone(timedelta(hours=3))
+        now_eat = datetime.now(EAT)
+
+        # 1. SMS older than 30 minutes (e.g. 40 minutes old)
+        old_time_str = (now_eat - timedelta(minutes=40)).strftime("%d/%m/%Y %H:%M:%S")
+        sms_old = f"Transaction of Birr 100.00 from 0911223348 to 0909425014 completed. Ref No. TXNOLD at {old_time_str}."
+        result_old = await deposit_service.process_sms_deposit(
+            user_id=user.id,
+            expected_amount=100.00,
+            sms_text=sms_old
+        )
+        self.assertFalse(result_old.success)
+        self.assertIn("too old", result_old.message)
+
+        # 2. SMS in the future (e.g. 10 minutes in the future)
+        future_time_str = (now_eat + timedelta(minutes=10)).strftime("%d/%m/%Y %H:%M:%S")
+        sms_future = f"Transaction of Birr 100.00 from 0911223348 to 0909425014 completed. Ref No. TXNFUT at {future_time_str}."
+        result_future = await deposit_service.process_sms_deposit(
+            user_id=user.id,
+            expected_amount=100.00,
+            sms_text=sms_future
+        )
+        self.assertFalse(result_future.success)
+        self.assertIn("in the future", result_future.message)
 
 
 if __name__ == "__main__":

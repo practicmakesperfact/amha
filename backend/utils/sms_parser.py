@@ -6,6 +6,7 @@ Handles various formats of Telebirr SMS.
 import hashlib
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 
@@ -113,3 +114,49 @@ def parse_telebirr_sms(sms_text: str) -> ParsedSMS:
         transaction_date=date,
         raw_text=text,
     )
+
+
+def parse_sms_datetime(date_str: str) -> Optional[datetime]:
+    """Parse transaction date string from Telebirr SMS into a timezone-aware EAT datetime."""
+    from datetime import datetime, timezone, timedelta
+    if not date_str:
+        return None
+    
+    # Try different potential datetime formats
+    formats = [
+        "%d/%m/%Y %H:%M:%S",
+        "%d-%m-%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%d-%m-%Y %H:%M",
+        "%Y/%m/%d %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y/%m/%d %H:%M",
+        "%Y-%m-%d %H:%M",
+    ]
+    
+    EAT = timezone(timedelta(hours=3))
+    date_str_clean = date_str.strip()
+    
+    for fmt in formats:
+        try:
+            dt = datetime.strptime(date_str_clean, fmt)
+            return dt.replace(tzinfo=EAT)
+        except ValueError:
+            continue
+            
+    # Try date-only formats
+    date_only_formats = [
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+        "%Y/%m/%d",
+        "%Y-%m-%d",
+    ]
+    for fmt in date_only_formats:
+        try:
+            dt = datetime.strptime(date_str_clean, fmt)
+            return dt.replace(tzinfo=EAT)
+        except ValueError:
+            continue
+            
+    return None
+

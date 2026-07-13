@@ -1,7 +1,4 @@
-"""
-All Telegram keyboard definitions for AMHABINGO Bot.
-Uses ReplyKeyboardMarkup (persistent) and InlineKeyboardMarkup where appropriate.
-"""
+
 
 from telegram import (
     InlineKeyboardButton,

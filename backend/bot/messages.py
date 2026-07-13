@@ -169,12 +169,24 @@ def balance_message(
     play_wallet: float,
     coin: int,
 ) -> str:
+    # Left-align key names to index 18 for clean column spacing
+    line_name = f"{'Name:':<18}{name}"
+    line_phone = f"{'Phone:':<18}{phone}"
+    line_main = f"{'Main wallet:':<18}{main_wallet:.2f}"
+    line_play = f"{'Play wallet:':<18}{play_wallet:.2f}"
+    line_coin = f"{'Coin:':<18}{coin}"
+    
+    content = (
+        f"{line_name}\n"
+        f"{line_phone}\n"
+        f"{line_main}\n"
+        f"{line_play}\n"
+        f"{line_coin}"
+    )
+    
     return (
-        f"👤 <b>Name:</b>\n{escape_html(name)}\n\n"
-        f"📞 <b>Phone:</b>\n{escape_html(phone)}\n\n"
-        f"💰 <b>Main Wallet:</b>\n<code>{main_wallet:.2f} ETB</code>\n\n"
-        f"🎮 <b>Play Wallet:</b>\n<code>{play_wallet:.2f} ETB</code>\n\n"
-        f"🪙 <b>Coin:</b>\n<code>{coin}</code>"
+        "💼 <b>Account Info</b>\n\n"
+        f"<pre>{escape_html(content)}</pre>"
     )
 
 

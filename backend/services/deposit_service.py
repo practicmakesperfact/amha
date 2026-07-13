@@ -102,6 +102,75 @@ class DepositService:
                 parsed_sms=parsed,
             )
 
+        # ── Validate transaction date/time ─────────────────────────────────
+        if not parsed.transaction_date:
+            return DepositResult(
+                success=False,
+                message=(
+                    "❌ Could not extract transaction date/time from SMS.\n"
+                    "Please paste the complete Telebirr confirmation message."
+                ),
+                parsed_sms=parsed,
+            )
+
+        from backend.utils.sms_parser import parse_sms_datetime
+        from datetime import datetime, timezone, timedelta
+
+        tx_dt = parse_sms_datetime(parsed.transaction_date)
+        if not tx_dt:
+            logger.warning("SMS date parsing failed", user_id=user_id, raw_date=parsed.transaction_date)
+            return DepositResult(
+                success=False,
+                message=(
+                    "❌ Invalid transaction date format in SMS.\n"
+                    "Please paste the complete, unmodified Telebirr confirmation message."
+                ),
+                parsed_sms=parsed,
+            )
+
+        EAT = timezone(timedelta(hours=3))
+        now_eat = datetime.now(EAT)
+        
+        # Check transaction age (e.g., max 30 minutes)
+        time_diff = now_eat - tx_dt
+        max_age = timedelta(minutes=30)
+        future_tolerance = timedelta(minutes=5)  # tolerates small client/server clock skew
+
+        if time_diff > max_age:
+            logger.warning(
+                "SMS transaction is too old",
+                user_id=user_id,
+                tx_date=parsed.transaction_date,
+                tx_age_seconds=time_diff.total_seconds(),
+            )
+            return DepositResult(
+                success=False,
+                message=(
+                    "❌ Deposit verification failed.\n"
+                    "This transaction is too old (older than 30 minutes).\n"
+                    "Deposits must be verified immediately after payment. "
+                    "If you faced a delay, please contact support."
+                ),
+                parsed_sms=parsed,
+            )
+
+        if time_diff < -future_tolerance:
+            logger.warning(
+                "SMS transaction is in the future",
+                user_id=user_id,
+                tx_date=parsed.transaction_date,
+                tx_age_seconds=time_diff.total_seconds(),
+            )
+            return DepositResult(
+                success=False,
+                message=(
+                    "❌ Deposit verification failed.\n"
+                    "The transaction timestamp is invalid (in the future).\n"
+                    "Please check your system or try again."
+                ),
+                parsed_sms=parsed,
+            )
+
         already_used = await self.sms_repo.is_reference_used(parsed.reference_number)
         if already_used:
             logger.warning(
