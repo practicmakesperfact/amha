@@ -1,0 +1,101 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: amhabingo_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-amhabingo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-amhabingo_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-amhabingo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-amhabingo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: amhabingo_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Migration runner (one-shot) ────────────────────────────
+  migrate:
+    build: .
+    container_name: amhabingo_migrate
+    command: python -m alembic upgrade head
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-amhabingo}:${POSTGRES_PASSWORD:-amhabingo_secret}@postgres:5432/${POSTGRES_DB:-amhabingo}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Bot (webhook mode) ─────────────────────────────────────
+  bot:
+    build: .
+    container_name: amhabingo_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-amhabingo}:${POSTGRES_PASSWORD:-amhabingo_secret}@postgres:5432/${POSTGRES_DB:-amhabingo}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Bot (polling mode — alternative for dev) ───────────────
+  bot_polling:
+    build: .
+    container_name: amhabingo_bot_polling
+    command: python -m backend.run_polling
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-amhabingo}:${POSTGRES_PASSWORD:-amhabingo_secret}@postgres:5432/${POSTGRES_DB:-amhabingo}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    profiles:
+      - polling  # Only starts with: docker-compose --profile polling up
+
+volumes:
+  postgres_data:
+  redis_data:

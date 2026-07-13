@@ -1,0 +1,12 @@
+python-telegram-bot==21.11.1
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+redis[hiredis]==5.2.1
+pydantic==2.10.3
+pydantic-settings==2.7.0
+structlog==24.4.0
+httpx==0.28.1
+python-dotenv==1.0.1
