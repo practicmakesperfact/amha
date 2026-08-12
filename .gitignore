@@ -1,4 +1,9 @@
+# Environment variables (SENSITIVE!)
 .env
+.env.*
+!.env.example
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -10,10 +15,43 @@ build/
 .venv/
 venv/
 env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing & Caching
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.coverage
+htmlcov/
+
+# Logs (may contain sensitive data)
 *.log
 logs/
+
+# Database (if using SQLite locally)
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Alembic (migration history safe, but compiled)
+alembic/__pycache__/
+alembic/versions/__pycache__/
+
+# Backup files (may contain sensitive data)
+*.bak
+*.backup
+*.sql
+
+# Docker volumes (may contain data)
+.docker/
+volumes/
