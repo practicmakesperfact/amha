@@ -62,6 +62,12 @@ class TransferService:
                 message=f"❌ Minimum transfer amount is *{settings.MIN_TRANSFER_AMOUNT:.2f} ETB*."
             )
 
+        if amount > settings.MAX_TRANSFER_AMOUNT:
+            return TransferResult(
+                success=False,
+                message=f"❌ Maximum transfer amount is *{settings.MAX_TRANSFER_AMOUNT:.2f} ETB*."
+            )
+
         if sender.main_wallet < amount:
             return TransferResult(
                 success=False,
@@ -134,6 +140,27 @@ class TransferService:
             t = await self.repo.get_by_id(transfer_id)
             if t is None:
                 return None
+            
+            # Check if already processed
+            if t.status != TransferStatus.PENDING:
+                logger.warning(
+                    "Attempted to approve already processed transfer",
+                    transfer_id=transfer_id,
+                    current_status=t.status.value,
+                )
+                return None
+            
+            # Verify sender has sufficient balance (prevent race conditions)
+            sender = await self.user_repo.get_by_id(t.sender_id)
+            if sender is None or sender.main_wallet < t.amount:
+                logger.error(
+                    "Insufficient balance for transfer approval",
+                    transfer_id=transfer_id,
+                    sender_balance=sender.main_wallet if sender else 0,
+                    transfer_amount=t.amount,
+                )
+                return None
+            
             # Atomic fund movement on approval
             await self.user_repo.transfer_funds(
                 sender_id=t.sender_id,
@@ -152,6 +179,19 @@ class TransferService:
         self, transfer_id: int, admin_telegram_id: int, note: str = ""
     ) -> Optional[Transfer]:
         async with self.session.begin_nested():
+            t = await self.repo.get_by_id(transfer_id)
+            if t is None:
+                return None
+            
+            # Check if already processed
+            if t.status != TransferStatus.PENDING:
+                logger.warning(
+                    "Attempted to reject already processed transfer",
+                    transfer_id=transfer_id,
+                    current_status=t.status.value,
+                )
+                return None
+            
             t = await self.repo.update_status(
                 transfer_id, TransferStatus.REJECTED, admin_id=admin_telegram_id, note=note
             )

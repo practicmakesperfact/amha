@@ -33,6 +33,8 @@ class DepositService:
 
     async def create_pending_deposit(self, user_id: int, amount: float) -> Deposit:
         """Create a PENDING deposit record before SMS submission."""
+        if amount < settings.MIN_DEPOSIT_AMOUNT:
+            raise ValueError(f"Minimum deposit amount is {settings.MIN_DEPOSIT_AMOUNT} ETB")
         async with self.session.begin_nested():
             deposit = await self.deposit_repo.create(
                 user_id=user_id,
@@ -236,6 +238,16 @@ class DepositService:
             deposit = await self.deposit_repo.get_by_id(deposit_id)
             if deposit is None:
                 return None
+            
+            # Check if already processed
+            if deposit.status != DepositStatus.PENDING_ADMIN_APPROVAL:
+                logger.warning(
+                    "Attempted to approve already processed deposit",
+                    deposit_id=deposit_id,
+                    current_status=deposit.status.value,
+                )
+                return None
+            
             deposit = await self.deposit_repo.update_status(
                 deposit_id, DepositStatus.APPROVED, admin_id=admin_telegram_id
             )
@@ -253,6 +265,19 @@ class DepositService:
         self, deposit_id: int, admin_telegram_id: int, note: str = ""
     ) -> Optional[Deposit]:
         async with self.session.begin_nested():
+            deposit = await self.deposit_repo.get_by_id(deposit_id)
+            if deposit is None:
+                return None
+            
+            # Check if already processed
+            if deposit.status != DepositStatus.PENDING_ADMIN_APPROVAL:
+                logger.warning(
+                    "Attempted to reject already processed deposit",
+                    deposit_id=deposit_id,
+                    current_status=deposit.status.value,
+                )
+                return None
+            
             deposit = await self.deposit_repo.update_status(
                 deposit_id, DepositStatus.REJECTED, admin_id=admin_telegram_id, note=note
             )

@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     MIN_DEPOSIT_AMOUNT: float = 10.0
     MIN_WITHDRAWAL_AMOUNT: float = 50.0
     MIN_TRANSFER_AMOUNT: float = 10.0
+    MAX_WITHDRAWAL_AMOUNT: float = 50000.0
+    MAX_TRANSFER_AMOUNT: float = 50000.0
 
     # ── Rate Limiting ─────────────────────────────────────────
     RATE_LIMIT_MAX_REQUESTS: int = 30

@@ -95,6 +95,17 @@ async def deposit_amount_handler(
         return
 
     try:
+        from backend.core.config import settings
+        
+        # Validate minimum deposit
+        if amount < settings.MIN_DEPOSIT_AMOUNT:
+            await update.effective_message.reply_text(
+                f"❌ Minimum deposit amount is <b>{settings.MIN_DEPOSIT_AMOUNT:.2f} ETB</b>.\n\nPlease enter a valid amount.",
+                reply_markup=cancel_keyboard(),
+                parse_mode="HTML",
+            )
+            return
+        
         # Store amount in Redis context
         await update_context(tg_user.id, deposit_amount=amount)
         await set_state(tg_user.id, UserState.AWAITING_DEPOSIT_SMS)

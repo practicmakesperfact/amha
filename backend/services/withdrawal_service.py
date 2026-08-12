@@ -51,6 +51,12 @@ class WithdrawalService:
                 message=f"❌ Minimum withdrawal amount is *{settings.MIN_WITHDRAWAL_AMOUNT:.2f} ETB*."
             )
 
+        if amount > settings.MAX_WITHDRAWAL_AMOUNT:
+            return WithdrawalResult(
+                success=False,
+                message=f"❌ Maximum withdrawal amount is *{settings.MAX_WITHDRAWAL_AMOUNT:.2f} ETB*."
+            )
+
         if user.main_wallet < amount:
             return WithdrawalResult(
                 success=False,
@@ -101,6 +107,27 @@ class WithdrawalService:
             w = await self.repo.get_by_id(withdrawal_id)
             if w is None:
                 return None
+            
+            # Check if already processed
+            if w.status != WithdrawalStatus.PENDING:
+                logger.warning(
+                    "Attempted to approve already processed withdrawal",
+                    withdrawal_id=withdrawal_id,
+                    current_status=w.status.value,
+                )
+                return None
+            
+            # Verify user has sufficient balance (prevent race conditions)
+            user = await self.user_repo.get_by_id(w.user_id)
+            if user is None or user.main_wallet < w.amount:
+                logger.error(
+                    "Insufficient balance for withdrawal approval",
+                    withdrawal_id=withdrawal_id,
+                    user_balance=user.main_wallet if user else 0,
+                    withdrawal_amount=w.amount,
+                )
+                return None
+            
             # Deduct balance only on approval
             await self.user_repo.debit_wallet(user_id=w.user_id, amount=w.amount)
             w = await self.repo.update_status(
@@ -115,6 +142,19 @@ class WithdrawalService:
         self, withdrawal_id: int, admin_telegram_id: int, note: str = ""
     ) -> Optional[Withdrawal]:
         async with self.session.begin_nested():
+            w = await self.repo.get_by_id(withdrawal_id)
+            if w is None:
+                return None
+            
+            # Check if already processed
+            if w.status != WithdrawalStatus.PENDING:
+                logger.warning(
+                    "Attempted to reject already processed withdrawal",
+                    withdrawal_id=withdrawal_id,
+                    current_status=w.status.value,
+                )
+                return None
+            
             w = await self.repo.update_status(
                 withdrawal_id, WithdrawalStatus.REJECTED, admin_id=admin_telegram_id, note=note
             )
