@@ -232,3 +232,107 @@ class UsedSMS(Base):
 
     def __repr__(self) -> str:
         return f"<UsedSMS id={self.id} ref={self.reference_number}>"
+
+
+# ── WalletTransaction / Complete ledger ──────────────────────────────────────
+
+
+class TransactionType(str, enum.Enum):
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    TRANSFER_OUT = "TRANSFER_OUT"
+    TRANSFER_IN = "TRANSFER_IN"
+    ADMIN_CREDIT = "ADMIN_CREDIT"
+    ADMIN_DEBIT = "ADMIN_DEBIT"
+
+
+class WalletTransaction(Base):
+    """Complete ledger of all wallet movements for audit trail."""
+
+    __tablename__ = "wallet_transactions"
+    __table_args__ = (
+        Index("idx_wallet_tx_user_created", "user_id", "created_at"),
+        Index("idx_wallet_tx_type", "transaction_type"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    transaction_type: Mapped[TransactionType] = mapped_column(
+        Enum(TransactionType), nullable=False
+    )
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    balance_before: Mapped[float] = mapped_column(Float, nullable=False)
+    balance_after: Mapped[float] = mapped_column(Float, nullable=False)
+    
+    # Reference to related entity
+    deposit_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    withdrawal_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    transfer_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    
+    description: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship("User")
+
+    def __repr__(self) -> str:
+        return f"<WalletTransaction id={self.id} user={self.user_id} type={self.transaction_type} amount={self.amount}>"
+
+
+# ── AuditLog / System audit trail ────────────────────────────────────────────
+
+
+class AuditAction(str, enum.Enum):
+    USER_REGISTERED = "USER_REGISTERED"
+    DEPOSIT_CREATED = "DEPOSIT_CREATED"
+    DEPOSIT_APPROVED = "DEPOSIT_APPROVED"
+    DEPOSIT_REJECTED = "DEPOSIT_REJECTED"
+    WITHDRAWAL_CREATED = "WITHDRAWAL_CREATED"
+    WITHDRAWAL_APPROVED = "WITHDRAWAL_APPROVED"
+    WITHDRAWAL_REJECTED = "WITHDRAWAL_REJECTED"
+    TRANSFER_CREATED = "TRANSFER_CREATED"
+    TRANSFER_EXECUTED = "TRANSFER_EXECUTED"
+    WALLET_CREDITED = "WALLET_CREDITED"
+    WALLET_DEBITED = "WALLET_DEBITED"
+    ADMIN_ACTION = "ADMIN_ACTION"
+
+
+class AuditLog(Base):
+    """Complete audit trail of all system actions."""
+
+    __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("idx_audit_user_created", "user_id", "created_at"),
+        Index("idx_audit_action", "action"),
+        Index("idx_audit_admin", "admin_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    action: Mapped[AuditAction] = mapped_column(Enum(AuditAction), nullable=False)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    admin_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    
+    # Related entity references
+    deposit_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    withdrawal_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    transfer_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    
+    # Details
+    amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    extra_data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string for additional data
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[Optional[User]] = relationship("User")
+
+    def __repr__(self) -> str:
+        return f"<AuditLog id={self.id} action={self.action} user={self.user_id}>"

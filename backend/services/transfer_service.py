@@ -39,13 +39,13 @@ class TransferService:
             return await self.user_repo.get_by_username(identifier.lstrip("@"))
         return await self.user_repo.get_by_phone(identifier)
 
-    async def request_transfer(
+    async def execute_transfer(
         self,
         sender_id: int,
         recipient_identifier: str,
         amount: float,
     ) -> TransferResult:
-        """Create a pending transfer request."""
+        """Execute instant transfer without admin approval."""
         sender = await self.user_repo.get_by_id(sender_id)
         if sender is None:
             return TransferResult(success=False, message="❌ Sender not found.")
@@ -96,28 +96,43 @@ class TransferService:
                 message="❌ Recipient is not a registered user."
             )
 
+        # Execute transfer atomically and immediately
         async with self.session.begin_nested():
+            # Move funds atomically
+            await self.user_repo.transfer_funds(
+                sender_id=sender_id,
+                receiver_id=recipient.id,  # type: ignore[union-attr]
+                amount=amount,
+            )
+            
+            # Record transfer with APPROVED status
             transfer = await self.repo.create(
                 sender_id=sender_id,
                 receiver_id=recipient.id,  # type: ignore[union-attr]
                 amount=amount,
             )
+            # Mark as approved immediately
+            transfer = await self.repo.update_status(
+                transfer.id, TransferStatus.APPROVED, admin_id=None
+            )
 
         logger.info(
-            "Transfer requested",
+            "Transfer executed instantly",
             sender_id=sender_id,
             receiver_id=recipient.id,  # type: ignore[union-attr]
             amount=amount,
             transfer_id=transfer.id,
         )
 
+        recipient_name = recipient.full_name or recipient.username or recipient_identifier  # type: ignore[union-attr]
+
         return TransferResult(
             success=True,
             message=(
-                "✅ Transfer request submitted!\n\n"
+                "✅ Transfer successful!\n\n"
                 f"Amount: *{amount:.2f} ETB*\n"
-                f"To: *{recipient_identifier}*\n\n"
-                "An administrator will process your request shortly."
+                f"To: *{recipient_name}*\n\n"
+                "Funds have been transferred instantly."
             ),
             transfer=transfer,
             receiver_telegram_id=recipient.telegram_id,  # type: ignore[union-attr]

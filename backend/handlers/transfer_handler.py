@@ -162,7 +162,7 @@ async def transfer_recipient_handler(
 async def transfer_amount_handler(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    """Step 3: Amount entered — create pending transfer request."""
+    """Step 3: Amount entered — execute instant transfer."""
     if update.effective_user is None or update.effective_message is None:
         return
 
@@ -202,55 +202,41 @@ async def transfer_amount_handler(
                     raise ValueError("Sender not found")
 
                 t_service = TransferService(session)
-
-                # Use internal user IDs for the request
-                # Build a fake "identifier" for the service — pass receiver by user ID via username lookup
                 receiver = await user_service.get_by_id(receiver_id)
                 if receiver is None:
                     raise ValueError("Receiver not found")
 
-                # Validate balance before creating request
-                if sender.main_wallet < amount:
-                    await clear_state(tg_user.id)
-                    await update.effective_message.reply_text(
-                        f"❌ Insufficient balance\\.\nYour Main Wallet: *{sender.main_wallet:.2f} ETB*",
-                        reply_markup=main_menu_keyboard(),
-                        parse_mode="HTML",
-                    )
-                    return
-
-                from backend.repositories.transfer_repository import TransferRepository
-                t_repo = TransferRepository(session)
-                transfer = await t_repo.create(
+                # Execute instant transfer
+                result = await t_service.execute_transfer(
                     sender_id=sender.id,
-                    receiver_id=receiver_id,
+                    recipient_identifier=receiver.username or receiver.phone_number or str(receiver_id),
                     amount=amount,
                 )
 
         await clear_state(tg_user.id)
 
-        sender_name = sender.full_name or sender.username or "User"
-
         await update.effective_message.reply_text(
-            (
-                "✅ *Transfer request submitted\\!*\n\n"
-                f"Amount: *{amount:.2f} ETB*\n"
-                f"To: *{escape_html(receiver_name)}*\n\n"
-                "An administrator will process your request shortly\\."
-            ),
+            result.message,
             reply_markup=main_menu_keyboard(),
             parse_mode="HTML",
         )
-
-        await _notify_admins_transfer(
-            context=context,
-            sender_name=sender_name,
-            sender_id=sender.id,
-            receiver_name=receiver_name,
-            receiver_id=receiver_id,
-            transfer_id=transfer.id,
-            amount=amount,
-        )
+        
+        # Notify receiver if successful
+        if result.success and receiver:
+            try:
+                sender_name = sender.full_name or sender.username or "Someone"
+                await context.bot.send_message(
+                    chat_id=receiver.chat_id,
+                    text=(
+                        "🎁 <b>You received a transfer!</b>\n\n"
+                        f"<b>{escape_html(sender_name)}</b> sent you <b>{amount:.2f} ETB</b>.\n\n"
+                        "The amount has been added to your Main Wallet."
+                    ),
+                    reply_markup=main_menu_keyboard(),
+                    parse_mode="HTML",
+                )
+            except Exception:
+                logger.warning("Failed to notify receiver of transfer", user_id=receiver.id)
 
     except Exception:
         logger.exception("Error in transfer_amount_handler", telegram_id=tg_user.id)

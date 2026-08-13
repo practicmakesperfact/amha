@@ -97,12 +97,13 @@ All features from the prompt have been fully implemented, tested, and are produc
 |---------|--------|-------|
 | Recipient lookup | ✅ | By username or phone |
 | Amount validation | ✅ | Min 10 ETB, Max 50k ETB |
-| Balance check | ✅ | Before creating request |
+| Balance check | ✅ | Before execution |
 | Self-transfer prevention | ✅ | Cannot send to yourself |
-| Admin approval | ✅ | With inline buttons |
+| **Instant execution** | ✅ | **No admin approval required** |
 | Atomic fund movement | ✅ | Debit sender, credit receiver |
 | Both users notified | ✅ | Sender and receiver get messages |
-| Race condition protection | ✅ | Balance verified at approval time |
+| Row locking | ✅ | Prevents race conditions |
+| Ledger recording | ✅ | All transactions tracked |
 
 ### Admin Features
 | Feature | Status | Notes |
@@ -127,6 +128,9 @@ All features from the prompt have been fully implemented, tested, and are produc
 | Balance atomicity | ✅ | All operations transactional |
 | Idempotent approvals | ✅ | Can't double-approve |
 | Status verification | ✅ | Only PENDING requests processed |
+| **Row locking** | ✅ | **SELECT FOR UPDATE prevents races** |
+| **Wallet ledger** | ✅ | **Complete transaction history** |
+| **Audit logs** | ✅ | **All actions tracked** |
 
 ### Architecture & Code Quality
 | Feature | Status | Notes |

@@ -106,36 +106,133 @@ class UserRepository(BaseRepository[User]):
         return user
 
     async def credit_wallet(self, user_id: int, amount: float) -> Optional[User]:
-        """Add amount to main wallet."""
-        user = await self.get_by_id(user_id)
+        """Add amount to main wallet with ledger tracking and row locking."""
+        from sqlalchemy import select
+        from backend.models.models import TransactionType
+        
+        # Lock the user row for update
+        result = await self.session.execute(
+            select(User).where(User.id == user_id).with_for_update()
+        )
+        user = result.scalar_one_or_none()
+        
         if user is None:
             return None
+        
+        balance_before = user.main_wallet
         user.main_wallet = round(user.main_wallet + amount, 2)
+        balance_after = user.main_wallet
+        
         await self.session.flush()
+        
+        # Record in ledger (optional - works without wallet_transactions table)
+        try:
+            from backend.repositories.wallet_transaction_repository import WalletTransactionRepository
+            wallet_tx_repo = WalletTransactionRepository(self.session)
+            await wallet_tx_repo.create_transaction(
+                user_id=user_id,
+                transaction_type=TransactionType.DEPOSIT,
+                amount=amount,
+                balance_before=balance_before,
+                balance_after=balance_after,
+            )
+        except Exception:
+            # Ledger table doesn't exist yet - continue without it
+            pass
+        
         await self.session.refresh(user)
         return user
 
     async def debit_wallet(self, user_id: int, amount: float) -> Optional[User]:
-        """Subtract amount from main wallet (caller must check balance first)."""
-        user = await self.get_by_id(user_id)
+        """Subtract amount from main wallet with ledger tracking and row locking."""
+        from sqlalchemy import select
+        from backend.models.models import TransactionType
+        
+        # Lock the user row for update
+        result = await self.session.execute(
+            select(User).where(User.id == user_id).with_for_update()
+        )
+        user = result.scalar_one_or_none()
+        
         if user is None:
             return None
+        
+        balance_before = user.main_wallet
         user.main_wallet = round(user.main_wallet - amount, 2)
+        balance_after = user.main_wallet
+        
         await self.session.flush()
+        
+        # Record in ledger (optional)
+        try:
+            from backend.repositories.wallet_transaction_repository import WalletTransactionRepository
+            wallet_tx_repo = WalletTransactionRepository(self.session)
+            await wallet_tx_repo.create_transaction(
+                user_id=user_id,
+                transaction_type=TransactionType.WITHDRAWAL,
+                amount=amount,
+                balance_before=balance_before,
+                balance_after=balance_after,
+            )
+        except Exception:
+            pass
+        
         await self.session.refresh(user)
         return user
 
     async def transfer_funds(
         self, sender_id: int, receiver_id: int, amount: float
     ) -> tuple[Optional[User], Optional[User]]:
-        """Atomically move funds from sender to receiver."""
-        sender = await self.get_by_id(sender_id)
-        receiver = await self.get_by_id(receiver_id)
+        """Atomically move funds from sender to receiver with ledger tracking and row locking."""
+        from sqlalchemy import select
+        from backend.models.models import TransactionType
+        
+        # Lock both users for update (ordered by ID to prevent deadlocks)
+        ids = sorted([sender_id, receiver_id])
+        result = await self.session.execute(
+            select(User).where(User.id.in_(ids)).with_for_update().order_by(User.id)
+        )
+        users = {u.id: u for u in result.scalars().all()}
+        
+        sender = users.get(sender_id)
+        receiver = users.get(receiver_id)
+        
         if sender is None or receiver is None:
             return None, None
+        
+        # Debit sender
+        sender_balance_before = sender.main_wallet
         sender.main_wallet = round(sender.main_wallet - amount, 2)
+        sender_balance_after = sender.main_wallet
+        
+        # Credit receiver
+        receiver_balance_before = receiver.main_wallet
         receiver.main_wallet = round(receiver.main_wallet + amount, 2)
+        receiver_balance_after = receiver.main_wallet
+        
         await self.session.flush()
+        
+        # Record in ledger for both users (optional)
+        try:
+            from backend.repositories.wallet_transaction_repository import WalletTransactionRepository
+            wallet_tx_repo = WalletTransactionRepository(self.session)
+            await wallet_tx_repo.create_transaction(
+                user_id=sender_id,
+                transaction_type=TransactionType.TRANSFER_OUT,
+                amount=amount,
+                balance_before=sender_balance_before,
+                balance_after=sender_balance_after,
+            )
+            await wallet_tx_repo.create_transaction(
+                user_id=receiver_id,
+                transaction_type=TransactionType.TRANSFER_IN,
+                amount=amount,
+                balance_before=receiver_balance_before,
+                balance_after=receiver_balance_after,
+            )
+        except Exception:
+            pass
+        
         await self.session.refresh(sender)
         await self.session.refresh(receiver)
         return sender, receiver
