@@ -54,6 +54,18 @@ class Settings(BaseSettings):
     # ── Mini App ──────────────────────────────────────────────
     MINI_APP_URL: Optional[str] = None  # Set this when Mini App is ready
 
+    # ── Bingo Game Configuration ──────────────────────────────
+    BINGO_MIN_PLAYERS: int = 2
+    BINGO_MAX_PLAYERS: int = 100
+    BINGO_NUMBER_INTERVAL_SECONDS: int = 5
+    BINGO_AUTO_START: bool = False
+    BINGO_ALLOW_RECONNECT: bool = True
+    BINGO_FIRST_PRIZE_PERCENTAGE: int = 60
+    BINGO_SECOND_PRIZE_PERCENTAGE: int = 30
+    BINGO_THIRD_PRIZE_PERCENTAGE: int = 10
+    BINGO_MIN_ENTRY_FEE: float = 10.0
+    BINGO_MAX_ENTRY_FEE: float = 1000.0
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
