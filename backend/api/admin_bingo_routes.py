@@ -140,47 +140,16 @@ async def start_game(
     """Start a game."""
     try:
         async with db.begin():
-            game_repo = BingoGameRepository(db)
-            player_repo = GamePlayerRepository(db)
-            
-            game = await game_repo.get_by_id(game_id)
-            if not game:
-                raise HTTPException(status_code=404, detail="Game not found")
-            
-            if game.status != GameStatus.WAITING:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Cannot start game in status {game.status}"
-                )
-            
-            # Check minimum players
-            player_count = await player_repo.get_active_players_count(game_id)
-            if player_count < game.min_players:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Need at least {game.min_players} players (have {player_count})"
-                )
-            
-            # Update game status
-            game = await game_repo.update_status(game_id, GameStatus.PLAYING)
-            game.started_at = db.scalar("SELECT NOW()")
-            
-            # Log event
-            from backend.models.bingo_models import GameEvent, GameEventType
-            event = GameEvent(
-                game_id=game_id,
-                event_type=GameEventType.GAME_STARTED,
-                description=f"Game started by admin {admin_id}",
-            )
-            db.add(event)
-            
+            from backend.services.game_engine_service import GameEngineService
+            engine = GameEngineService(db)
+            game = await engine.start_game(game_id)
             await db.commit()
         
         logger.info("Game started", game_id=game_id, admin_id=admin_id)
         return {"message": "Game started", "game_id": game_id, "status": game.status}
     
-    except HTTPException:
-        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error("Error starting game", error=str(e), game_id=game_id)
         raise HTTPException(status_code=500, detail="Failed to start game")
@@ -192,27 +161,128 @@ async def call_number(
     admin_id: int = Depends(verify_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Manually call next number."""
+    """Manually call next number and check for winners."""
     try:
         async with db.begin():
-            number_caller = NumberCallerService(db)
-            called_number = await number_caller.call_next_number(game_id)
+            from backend.services.game_engine_service import GameEngineService
+            engine = GameEngineService(db)
+            winners = await engine.call_number_and_check_winners(game_id)
             await db.commit()
         
-        if not called_number:
-            raise HTTPException(status_code=400, detail="All numbers have been called")
-        
-        return {
-            "number": called_number.number,
-            "column_letter": called_number.column_letter,
-            "sequence": called_number.sequence,
+        result = {
+            "message": "Number called successfully",
+            "winners": [],
         }
+        
+        if winners:
+            result["winners"] = [
+                {
+                    "user_id": w.user_id,
+                    "winning_position": w.winning_position,
+                    "win_pattern": w.win_pattern.value if w.win_pattern else None,
+                    "prize_amount": w.prize_amount,
+                }
+                for w in winners
+            ]
+        
+        return result
     
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error("Error calling number", error=str(e), game_id=game_id)
         raise HTTPException(status_code=500, detail="Failed to call number")
+
+
+@router.get("/games/{game_id}/players", response_model=List[PlayerResponse])
+async def get_game_players(
+    game_id: int,
+    admin_id: int = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all players in a game."""
+    player_repo = GamePlayerRepository(db)
+    players = await player_repo.get_players_by_game(game_id)
+    
+    return [PlayerResponse.model_validate(p) for p in players]
+
+
+@router.post("/games/{game_id}/pause")
+async def pause_game(
+    game_id: int,
+    admin_id: int = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pause a playing game."""
+    try:
+        async with db.begin():
+            from backend.services.game_engine_service import GameEngineService
+            engine = GameEngineService(db)
+            game = await engine.pause_game(game_id)
+            await db.commit()
+        
+        if not game:
+            raise HTTPException(status_code=404, detail="Game not found")
+        
+        logger.info("Game paused", game_id=game_id, admin_id=admin_id)
+        return {"message": "Game paused", "game_id": game_id, "status": game.status}
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Error pausing game", error=str(e), game_id=game_id)
+        raise HTTPException(status_code=500, detail="Failed to pause game")
+
+
+@router.post("/games/{game_id}/resume")
+async def resume_game(
+    game_id: int,
+    admin_id: int = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Resume a paused game."""
+    try:
+        async with db.begin():
+            from backend.services.game_engine_service import GameEngineService
+            engine = GameEngineService(db)
+            game = await engine.resume_game(game_id)
+            await db.commit()
+        
+        if not game:
+            raise HTTPException(status_code=404, detail="Game not found")
+        
+        logger.info("Game resumed", game_id=game_id, admin_id=admin_id)
+        return {"message": "Game resumed", "game_id": game_id, "status": game.status}
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Error resuming game", error=str(e), game_id=game_id)
+        raise HTTPException(status_code=500, detail="Failed to resume game")
+
+
+@router.post("/games/{game_id}/finish")
+async def finish_game(
+    game_id: int,
+    admin_id: int = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Finish a game."""
+    try:
+        async with db.begin():
+            from backend.services.game_engine_service import GameEngineService
+            engine = GameEngineService(db)
+            game = await engine.finish_game(game_id)
+            await db.commit()
+        
+        logger.info("Game finished", game_id=game_id, admin_id=admin_id)
+        return {"message": "Game finished", "game_id": game_id, "status": game.status}
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Error finishing game", error=str(e), game_id=game_id)
+        raise HTTPException(status_code=500, detail="Failed to finish game")
 
 
 @router.get("/games/{game_id}/players", response_model=List[PlayerResponse])

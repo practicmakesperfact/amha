@@ -208,3 +208,17 @@ async def get_my_games(
         skip=skip,
         limit=limit,
     )
+
+
+@router.get("/me/stats")
+async def get_my_stats(
+    user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get player statistics."""
+    from backend.services.player_stats_service import PlayerStatsService
+    
+    stats_service = PlayerStatsService(db)
+    stats = await stats_service.get_player_stats(user_id)
+    
+    return stats
