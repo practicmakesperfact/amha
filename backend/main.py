@@ -113,6 +113,13 @@ def create_app() -> FastAPI:
 
     app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 
+    # ── Include bingo routes ───────────────────────────────────────────────
+    from backend.api.bingo_routes import router as bingo_router
+    from backend.api.admin_bingo_routes import router as admin_bingo_router
+
+    app.include_router(bingo_router)
+    app.include_router(admin_bingo_router, prefix="/api")
+
     return app
 
 
