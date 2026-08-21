@@ -273,3 +273,138 @@ class BingoGameService:
         )
         self.session.add(event)
         await self.session.flush()
+
+
+    async def start_game(self, game_id: int) -> BingoGame:
+        """Start a game if minimum players met."""
+        async with self.session.begin_nested():
+            game = await self.game_repo.get_by_id(game_id)
+            if not game:
+                raise ValueError("Game not found")
+
+            if game.status != GameStatus.WAITING:
+                raise ValueError(f"Cannot start game in status {game.status}")
+
+            player_count = await self.player_repo.get_active_players_count(game_id)
+            if player_count < game.min_players:
+                raise ValueError(f"Need at least {game.min_players} players (have {player_count})")
+
+            game = await self.game_repo.update_status(game_id, GameStatus.PLAYING)
+            game.started_at = datetime.utcnow()
+
+            players = await self.player_repo.get_players_by_game(game_id)
+            for player in players:
+                if player.status == PlayerStatus.JOINED:
+                    player.status = PlayerStatus.ACTIVE
+
+            await self.session.flush()
+
+            await self._log_event(
+                game_id=game_id,
+                event_type=GameEventType.GAME_STARTED,
+                description=f"Game {game.game_number} started with {player_count} players",
+                event_data={"player_count": player_count},
+            )
+
+        logger.info("Game started", game_id=game_id, player_count=player_count)
+        return game
+
+    async def pause_game(self, game_id: int) -> BingoGame:
+        """Pause a running game."""
+        async with self.session.begin_nested():
+            game = await self.game_repo.get_by_id(game_id)
+            if not game:
+                raise ValueError("Game not found")
+
+            if game.status != GameStatus.PLAYING:
+                raise ValueError(f"Cannot pause game in status {game.status}")
+
+            game = await self.game_repo.update_status(game_id, GameStatus.PAUSED)
+            game.paused_at = datetime.utcnow()
+
+            await self.session.flush()
+            await self._log_event(game_id=game_id, event_type=GameEventType.GAME_PAUSED, description=f"Game {game.game_number} paused")
+
+        logger.info("Game paused", game_id=game_id)
+        return game
+
+    async def resume_game(self, game_id: int) -> BingoGame:
+        """Resume a paused game."""
+        async with self.session.begin_nested():
+            game = await self.game_repo.get_by_id(game_id)
+            if not game:
+                raise ValueError("Game not found")
+
+            if game.status != GameStatus.PAUSED:
+                raise ValueError(f"Cannot resume game in status {game.status}")
+
+            game = await self.game_repo.update_status(game_id, GameStatus.PLAYING)
+            game.paused_at = None
+
+            await self.session.flush()
+            await self._log_event(game_id=game_id, event_type=GameEventType.GAME_RESUMED, description=f"Game {game.game_number} resumed")
+
+        logger.info("Game resumed", game_id=game_id)
+        return game
+
+    async def finish_game(self, game_id: int) -> BingoGame:
+        """Finish a game."""
+        async with self.session.begin_nested():
+            game = await self.game_repo.get_by_id(game_id)
+            if not game:
+                raise ValueError("Game not found")
+
+            if game.status == GameStatus.FINISHED:
+                raise ValueError("Game already finished")
+
+            game = await self.game_repo.update_status(game_id, GameStatus.FINISHED)
+            game.finished_at = datetime.utcnow()
+
+            await self.session.flush()
+            await self._log_event(game_id=game_id, event_type=GameEventType.GAME_FINISHED, description=f"Game {game.game_number} finished")
+
+        logger.info("Game finished", game_id=game_id)
+        return game
+
+    async def refund_all_players(self, game_id: int) -> int:
+        """Refund all players in a cancelled game. Idempotent."""
+        refund_count = 0
+        
+        async with self.session.begin_nested():
+            players = await self.player_repo.get_players_by_game(game_id)
+            
+            for player in players:
+                if player.entry_fee > 0 and player.prize_amount == 0:
+                    from sqlalchemy import select
+                    result = await self.session.execute(
+                        select(User).where(User.id == player.user_id).with_for_update()
+                    )
+                    user = result.scalar_one_or_none()
+                    
+                    if user:
+                        balance_before = user.main_wallet
+                        user.main_wallet = round(user.main_wallet + player.entry_fee, 2)
+                        balance_after = user.main_wallet
+                        
+                        player.prize_amount = player.entry_fee
+                        
+                        try:
+                            from backend.repositories.wallet_transaction_repository import WalletTransactionRepository
+                            wallet_tx_repo = WalletTransactionRepository(self.session)
+                            await wallet_tx_repo.create_transaction(
+                                user_id=user.id,
+                                transaction_type=TransactionType.ADMIN_CREDIT,
+                                amount=player.entry_fee,
+                                balance_before=balance_before,
+                                balance_after=balance_after,
+                                description=f"Refund - Game cancelled",
+                            )
+                        except Exception as e:
+                            logger.warning("Could not record wallet transaction", error=str(e))
+                        
+                        refund_count += 1
+
+            await self.session.flush()
+
+        logger.info("Players refunded", game_id=game_id, refund_count=refund_count)
+        return refund_count

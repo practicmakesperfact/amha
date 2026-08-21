@@ -116,11 +116,11 @@ def create_app() -> FastAPI:
     # ── Include bingo routes ───────────────────────────────────────────────
     from backend.api.bingo_routes import router as bingo_router
     from backend.api.admin_bingo_routes import router as admin_bingo_router
-    from backend.api.websocket_routes import router as websocket_router
+    from backend.websocket.bingo_websocket import router as ws_bingo_router
 
     app.include_router(bingo_router)
     app.include_router(admin_bingo_router, prefix="/api")
-    app.include_router(websocket_router)
+    app.include_router(ws_bingo_router)
 
     return app
 

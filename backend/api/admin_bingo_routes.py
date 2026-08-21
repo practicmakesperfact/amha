@@ -379,3 +379,94 @@ async def cancel_game(
     except Exception as e:
         logger.error("Error cancelling game", error=str(e), game_id=game_id)
         raise HTTPException(status_code=500, detail="Failed to cancel game")
+
+
+
+@router.post("/games/{game_id}/pause")
+async def pause_game(
+    game_id: int,
+    admin_id: int = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pause a running game."""
+    try:
+        async with db.begin():
+            from backend.services.bingo_game_service import BingoGameService
+            game_service = BingoGameService(db)
+            game = await game_service.pause_game(game_id)
+            await db.commit()
+        
+        return {"message": "Game paused", "game_id": game_id, "status": game.status}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Error pausing game", error=str(e), game_id=game_id)
+        raise HTTPException(status_code=500, detail="Failed to pause game")
+
+
+@router.post("/games/{game_id}/resume")
+async def resume_game(
+    game_id: int,
+    admin_id: int = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Resume a paused game."""
+    try:
+        async with db.begin():
+            from backend.services.bingo_game_service import BingoGameService
+            game_service = BingoGameService(db)
+            game = await game_service.resume_game(game_id)
+            await db.commit()
+        
+        return {"message": "Game resumed", "game_id": game_id, "status": game.status}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Error resuming game", error=str(e), game_id=game_id)
+        raise HTTPException(status_code=500, detail="Failed to resume game")
+
+
+@router.get("/games/{game_id}/events")
+async def get_game_events(
+    game_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    admin_id: int = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get game events history."""
+    event_repo = GameEventRepository(db)
+    events = await event_repo.get_events_by_game(game_id, skip=skip, limit=limit)
+    
+    return {
+        "game_id": game_id,
+        "events": [
+            {
+                "id": e.id,
+                "event_type": e.event_type,
+                "user_id": e.user_id,
+                "player_id": e.player_id,
+                "description": e.description,
+                "created_at": e.created_at,
+            }
+            for e in events
+        ],
+        "total": len(events),
+    }
+
+
+@router.get("/games/{game_id}/winners")
+async def get_game_winners(
+    game_id: int,
+    admin_id: int = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all winners for a game."""
+    player_repo = GamePlayerRepository(db)
+    winners = await player_repo.get_winners_by_game(game_id)
+    
+    return {
+        "game_id": game_id,
+        "winners": [PlayerResponse.model_validate(w) for w in winners],
+        "total_winners": len(winners),
+    }
