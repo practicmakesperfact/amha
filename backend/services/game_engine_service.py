@@ -59,6 +59,8 @@ class GameEngineService:
             
             if not called_number:
                 logger.warning("No more numbers to call", game_id=game_id)
+                # All 75 numbers called, no winner - house wins!
+                await self._handle_no_winner_house_wins(game_id)
                 return None, []
 
             await self.session.flush()
@@ -126,38 +128,49 @@ class GameEngineService:
         self, game_id: int, winners: List[Tuple[GamePlayer, WinPattern]]
     ) -> None:
         """
-        Process winners: mark as winners, assign positions, pay prizes.
+        Process winners: mark as winners, pay prizes, finish game.
+        SINGLE WINNER MODE: First player(s) to win get prize pool divided equally.
+        
+        Handles simultaneous winners (multiple players win on same number call).
         
         Args:
             game_id: Game ID
-            winners: List of (player, win_pattern) tuples
+            winners: List of (player, win_pattern) tuples - all detected on this number call
         """
-        # Get current winner count to assign positions
+        # Check if there's already a winner
         existing_winners = await self.player_repo.get_winners_by_game(game_id)
-        next_position = len(existing_winners) + 1
+        if existing_winners:
+            logger.warning("Game already has winner(s), ignoring new winners", game_id=game_id)
+            return
 
         game = await self.game_repo.get_by_id(game_id)
         if not game:
             return
 
-        # Parse prize distribution
-        try:
-            prize_distribution = json.loads(game.prize_distribution) if game.prize_distribution else {}
-        except json.JSONDecodeError:
-            from backend.core.config import settings
-            prize_distribution = {
-                "first": settings.BINGO_FIRST_PRIZE_PERCENTAGE,
-                "second": settings.BINGO_SECOND_PRIZE_PERCENTAGE,
-                "third": settings.BINGO_THIRD_PRIZE_PERCENTAGE,
-            }
-
-        # Mark players as winners
-        for idx, (player, win_pattern) in enumerate(winners):
-            position = next_position + idx
+        if not winners:
+            return
+        
+        # Count simultaneous winners on this number call
+        winner_count = len(winners)
+        
+        # Calculate prize per winner (split equally if simultaneous)
+        prize_per_winner = round(game.prize_pool / winner_count, 2) if winner_count > 0 else 0
+        
+        logger.info(
+            "Processing winners",
+            game_id=game_id,
+            winner_count=winner_count,
+            total_prize=game.prize_pool,
+            prize_per_winner=prize_per_winner,
+        )
+        
+        # Mark all simultaneous winners and pay them
+        for player, win_pattern in winners:
+            # Mark player as winner (all get position 1 since they won simultaneously)
             player.is_winner = True
             player.status = PlayerStatus.WINNER
             player.win_pattern = win_pattern
-            player.winning_position = position
+            player.winning_position = 1
 
             await self.session.flush()
 
@@ -168,43 +181,48 @@ class GameEngineService:
                 event_type=GameEventType.WINNER_DECLARED,
                 user_id=player.user_id,
                 player_id=player.id,
-                description=f"Winner #{position} - {win_pattern}",
+                description=f"Winner - {win_pattern} ({winner_count} simultaneous winner(s))",
                 event_data=json.dumps({
-                    "position": position,
+                    "position": 1,
                     "win_pattern": win_pattern.value,
+                    "simultaneous_winners": winner_count,
+                    "prize_split": prize_per_winner,
                 }),
             )
             self.session.add(event)
 
-        await self.session.flush()
+            await self.session.flush()
 
-        # Calculate and pay prizes
-        all_winners = await self.player_repo.get_winners_by_game(game_id)
+            # Pay winner their share of prize pool
+            if prize_per_winner > 0:
+                await self.prize_service.pay_winner(player, prize_per_winner, 1)
+                await self.session.flush()
+                
+                logger.info(
+                    "Prize paid to winner",
+                    game_id=game_id,
+                    user_id=player.user_id,
+                    prize_amount=prize_per_winner,
+                    total_winners=winner_count,
+                )
+
+        # IMMEDIATELY finish game after winner(s) found
+        await self.game_service.finish_game(game_id)
         
-        # Only pay if 1-3 winners (configurable)
-        if len(all_winners) <= 3:
-            prize_amounts = self.prize_service.calculate_prize_amounts(
-                prize_pool=game.prize_pool,
-                winner_count=len(all_winners),
-                prize_distribution=prize_distribution,
+        if winner_count == 1:
+            logger.info(
+                "Game finished - single winner takes all",
+                game_id=game_id,
+                user_id=winners[0][0].user_id,
+                prize=prize_per_winner,
             )
-
-            # Pay each winner who hasn't been paid yet
-            for player in all_winners:
-                if player.prize_amount == 0 and player.winning_position:
-                    idx = player.winning_position - 1
-                    if idx < len(prize_amounts):
-                        prize = prize_amounts[idx]
-                        if prize > 0:
-                            await self.prize_service.pay_winner(
-                                player, prize, player.winning_position
-                            )
-                            await self.session.flush()
-
-        # Check if game should finish (3 winners or all numbers called)
-        if len(all_winners) >= 3:
-            await self.game_service.finish_game(game_id)
-            logger.info("Game finished - 3 winners reached", game_id=game_id)
+        else:
+            logger.info(
+                "Game finished - simultaneous winners, prize split equally",
+                game_id=game_id,
+                winner_count=winner_count,
+                prize_per_winner=prize_per_winner,
+            )
 
     async def get_player_stats(self, user_id: int) -> dict:
         """
@@ -234,3 +252,99 @@ class GameEngineService:
             "total_winnings": round(total_winnings, 2),
             "net_profit": round(net_profit, 2),
         }
+
+    async def _handle_no_winner_house_wins(self, game_id: int) -> None:
+        """
+        Handle scenario when all 75 numbers called but no winner found.
+        Prize pool goes to the house (admin user @HA with phone 0909425014).
+        
+        Args:
+            game_id: Game ID
+        """
+        game = await self.game_repo.get_by_id(game_id)
+        if not game:
+            return
+
+        logger.warning(
+            "No winner after all numbers called - house wins!",
+            game_id=game_id,
+            prize_pool=game.prize_pool,
+        )
+
+        # Find admin user @HA (phone 0909425014)
+        from backend.repositories.user_repository import UserRepository
+        user_repo = UserRepository(self.session)
+        
+        # Try to find admin by phone number
+        from sqlalchemy import select
+        from backend.models.models import User
+        result = await self.session.execute(
+            select(User).where(User.phone_number == "0909425014")
+        )
+        admin_user = result.scalar_one_or_none()
+
+        if not admin_user:
+            logger.error(
+                "Admin user @HA (0909425014) not found! Cannot transfer house winnings.",
+                game_id=game_id,
+                prize_pool=game.prize_pool,
+            )
+            # Still finish the game even if admin not found
+            await self.game_service.finish_game(game_id)
+            return
+
+        # Transfer prize pool to admin's main wallet
+        if game.prize_pool > 0:
+            # Lock admin user's wallet for update
+            result = await self.session.execute(
+                select(User).where(User.id == admin_user.id).with_for_update()
+            )
+            admin_user = result.scalar_one_or_none()
+
+            if admin_user:
+                balance_before = admin_user.main_wallet
+                admin_user.main_wallet = round(admin_user.main_wallet + game.prize_pool, 2)
+                balance_after = admin_user.main_wallet
+
+                await self.session.flush()
+
+                # Record wallet transaction
+                from backend.repositories.wallet_transaction_repository import WalletTransactionRepository
+                from backend.models.models import TransactionType
+                wallet_tx_repo = WalletTransactionRepository(self.session)
+                await wallet_tx_repo.create_transaction(
+                    user_id=admin_user.id,
+                    transaction_type=TransactionType.ADMIN_CREDIT,
+                    amount=game.prize_pool,
+                    balance_before=balance_before,
+                    balance_after=balance_after,
+                    description=f"House wins - Game {game.game_number} (no winner)",
+                )
+
+                # Log event
+                from backend.models.bingo_models import GameEvent
+                event = GameEvent(
+                    game_id=game_id,
+                    event_type=GameEventType.GAME_FINISHED,
+                    user_id=admin_user.id,
+                    description=f"No winner found - House wins! Prize {game.prize_pool} Birr goes to @HA",
+                    event_data=json.dumps({
+                        "house_wins": True,
+                        "prize_pool": float(game.prize_pool),
+                        "admin_username": "HA",
+                        "admin_phone": "0909425014",
+                    }),
+                )
+                self.session.add(event)
+
+                await self.session.flush()
+
+                logger.info(
+                    "House wins - prize transferred to admin @HA",
+                    game_id=game_id,
+                    prize_pool=game.prize_pool,
+                    admin_user_id=admin_user.id,
+                )
+
+        # Finish the game
+        await self.game_service.finish_game(game_id)

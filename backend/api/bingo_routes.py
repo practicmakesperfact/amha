@@ -22,6 +22,7 @@ from backend.repositories.game_player_repository import GamePlayerRepository
 from backend.repositories.cartela_repository import CartelaRepository
 from backend.repositories.called_number_repository import CalledNumberRepository
 from backend.core.logging import get_logger
+from backend.middleware.rate_limiter import is_rate_limited
 
 logger = get_logger(__name__)
 
@@ -100,7 +101,11 @@ async def join_game(
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """Join a game."""
+    """Join a game. Rate limited: 5 requests per minute per user."""
+    # Apply rate limiting
+    if await is_rate_limited(user_id):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait and try again.")
+    
     try:
         async with db.begin():
             game_service = BingoGameService(db)
@@ -122,7 +127,11 @@ async def get_game_state(
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get complete game state for a player."""
+    """Get complete game state for a player. Rate limited: 30 requests per minute per user."""
+    # Apply rate limiting
+    if await is_rate_limited(user_id):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait and try again.")
+    
     game_repo = BingoGameRepository(db)
     player_repo = GamePlayerRepository(db)
     cartela_repo = CartelaRepository(db)
@@ -188,7 +197,11 @@ async def get_my_games(
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get all games the current user has joined."""
+    """Get all games the current user has joined. Rate limited: 20 requests per minute per user."""
+    # Apply rate limiting
+    if await is_rate_limited(user_id):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait and try again.")
+    
     player_repo = GamePlayerRepository(db)
     players = await player_repo.get_players_by_user(user_id, skip=skip, limit=limit)
     
@@ -211,30 +224,20 @@ async def get_my_games(
     )
 
 
-@router.get("/me/stats")
-async def get_my_stats(
-    user_id: int = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get player statistics."""
-    from backend.services.player_stats_service import PlayerStatsService
-    
-    stats_service = PlayerStatsService(db)
-    stats = await stats_service.get_player_stats(user_id)
-    
-    return stats
-
-
-
 @router.get("/me/stats", response_model=PlayerStatsResponse)
 async def get_my_stats(
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get player statistics."""
+    """Get player statistics. Rate limited: 20 requests per minute per user."""
+    # Apply rate limiting
+    if await is_rate_limited(user_id):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait and try again.")
+    
     from backend.services.game_engine_service import GameEngineService
     
     engine = GameEngineService(db)
     stats = await engine.get_player_stats(user_id)
     
     return PlayerStatsResponse(**stats)
+

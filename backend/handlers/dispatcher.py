@@ -10,6 +10,7 @@ from backend.bot.fsm import UserState, get_state
 from backend.core.logging import get_logger
 from backend.handlers.admin_handler import admin_callback_handler
 from backend.handlers.balance_handler import balance_handler
+from backend.handlers.bingo_handler import bingo_handler, bingo_callback_handler
 from backend.handlers.common import handle_cancel, send_main_menu
 from backend.handlers.deposit_handler import (
     deposit_amount_handler,
@@ -40,7 +41,8 @@ logger = get_logger(__name__)
 
 # Mapping button labels to their handlers
 BUTTON_HANDLERS = {
-    "🎮 Play": play_handler,
+    "🎲 Play Bingo": bingo_handler,
+    "🎮 Play": play_handler,  # Keep old button for backward compatibility
     "📝 Register": register_button_handler,
     "💰 Deposit": deposit_button_handler,
     "💵 Balance": balance_handler,

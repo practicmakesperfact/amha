@@ -62,48 +62,79 @@ class AutoNumberCallerService:
         logger.info("Auto number caller stopped")
 
     async def _call_numbers_for_active_games(self):
-        """Call numbers for all PLAYING games."""
+        """Call numbers for all PLAYING games and check time limits."""
         if not self.game_engine:
             return
 
+        from backend.database.session import get_session_factory
+        
         try:
-            # Get all PLAYING games
-            games = await self.game_engine.bingo_game_repo.get_games_by_status(
-                GameStatus.PLAYING
-            )
+            factory = get_session_factory()
+            async with factory() as session:
+                from backend.repositories.bingo_game_repository import BingoGameRepository
+                game_repo = BingoGameRepository(session)
+                
+                # Get all PLAYING games
+                games = await game_repo.get_games_by_status(GameStatus.PLAYING)
 
-            for game in games:
-                try:
-                    # Check if game still has numbers to call
-                    state = await self.game_engine.redis_service.get_game_state(game.id)
-                    
-                    if not state:
-                        logger.warning(f"No Redis state for game {game.id}, skipping")
-                        continue
+                for game in games:
+                    try:
+                        # Check if game has exceeded 5 minute time limit
+                        if game.started_at:
+                            from datetime import datetime, timezone
+                            now = datetime.now(timezone.utc)
+                            elapsed_seconds = (now - game.started_at).total_seconds()
+                            max_duration = 5 * 60  # 5 minutes in seconds
+                            
+                            if elapsed_seconds >= max_duration:
+                                # Time limit exceeded
+                                logger.warning(
+                                    f"Game {game.id} exceeded 5 minute limit "
+                                    f"({elapsed_seconds:.0f}s), checking for winners"
+                                )
+                                
+                                async with session.begin():
+                                    from backend.repositories.game_player_repository import GamePlayerRepository
+                                    from backend.services.game_engine_service import GameEngineService
+                                    
+                                    player_repo = GamePlayerRepository(session)
+                                    winners = await player_repo.get_winners_by_game(game.id)
+                                    
+                                    if not winners:
+                                        # No winners - house wins!
+                                        engine = GameEngineService(session)
+                                        await engine._handle_no_winner_house_wins(game.id)
+                                        await session.commit()
+                                        logger.info(f"Game {game.id} finished - house wins (time limit)")
+                                    else:
+                                        # Has winners - already finished
+                                        logger.info(f"Game {game.id} already has winners, skipping")
+                                
+                                continue
+                        
+                        # Call next number using the game engine
+                        async with session.begin():
+                            from backend.services.game_engine_service import GameEngineService
+                            engine = GameEngineService(session)
+                            called_number, new_winners = await engine.call_number_and_check_winners(game.id)
+                            await session.commit()
+                            
+                            if called_number:
+                                logger.info(
+                                    f"Auto-called number {called_number.number} for game {game.id}"
+                                )
+                            
+                            if new_winners:
+                                logger.info(
+                                    f"Winners found in game {game.id}: {len(new_winners)} player(s)"
+                                )
 
-                    available_numbers = state.get("available_numbers", [])
-                    
-                    if not available_numbers:
-                        # No more numbers to call, finish game
-                        logger.info(f"Game {game.id} has no more numbers, finishing")
-                        await self.game_engine.finish_game(game.id)
-                        continue
-
-                    # Call next number
-                    result = await self.game_engine.call_number(game.id)
-                    
-                    if result:
-                        logger.info(
-                            f"Auto-called number {result['number']} "
-                            f"({result['column']}) for game {game.id}"
+                    except Exception as e:
+                        logger.error(
+                            f"Error processing game {game.id}: {e}",
+                            exc_info=True
                         )
-
-                except Exception as e:
-                    logger.error(
-                        f"Error calling number for game {game.id}: {e}",
-                        exc_info=True
-                    )
-                    continue
+                        continue
 
         except Exception as e:
             logger.error(f"Error in auto number caller: {e}", exc_info=True)

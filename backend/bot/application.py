@@ -17,6 +17,7 @@ from backend.handlers.dispatcher import message_dispatcher
 from backend.handlers.register_handler import contact_handler
 from backend.handlers.start_handler import start_handler
 from backend.handlers.admin_handler import admin_callback_handler
+from backend.handlers.bingo_handler import bingo_callback_handler
 
 logger = get_logger(__name__)
 
@@ -63,6 +64,11 @@ def build_application() -> Application:
     # ── Admin callback query handler ───────────────────────────────────────
     application.add_handler(
         CallbackQueryHandler(admin_callback_handler, pattern=r"^admin:")
+    )
+
+    # ── Bingo callback query handler ───────────────────────────────────────
+    application.add_handler(
+        CallbackQueryHandler(bingo_callback_handler, pattern=r"^bingo:")
     )
 
     # ── General message dispatcher (menu buttons + FSM states) ────────────
