@@ -14,6 +14,7 @@ from backend.schemas.bingo_schemas import (
     PlayerResponse,
     CartelaResponse,
     GameStateResponse,
+    PlayerStatsResponse,
 )
 from backend.services.bingo_game_service import BingoGameService
 from backend.repositories.bingo_game_repository import BingoGameRepository

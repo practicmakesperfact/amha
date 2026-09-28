@@ -85,3 +85,10 @@ class BingoGameRepository(BaseRepository[BingoGame]):
             await self.session.flush()
             await self.session.refresh(game)
         return game
+
+    async def get_games_by_status(self, status: GameStatus) -> list[BingoGame]:
+        """Get all games with specific status."""
+        result = await self.session.execute(
+            select(BingoGame).where(BingoGame.status == status)
+        )
+        return list(result.scalars().all())

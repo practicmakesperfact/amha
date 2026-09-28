@@ -52,6 +52,10 @@ async def get_db_session() -> AsyncSession:
         yield session
 
 
+# Alias for compatibility
+get_db = get_db_session
+
+
 async def close_engine() -> None:
     global _engine
     if _engine is not None:

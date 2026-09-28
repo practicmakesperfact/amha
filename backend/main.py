@@ -14,18 +14,19 @@ from backend.bot.application import build_application
 from backend.core.config import settings
 from backend.core.logging import configure_logging, get_logger
 from backend.core.redis import close_redis, get_redis
-from backend.database.session import close_engine, get_engine
+from backend.database.session import close_engine, get_engine, get_session_factory
 
 logger = get_logger(__name__)
 
 # Global application instance
 _bot_application = None
+_auto_number_caller = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Startup and shutdown lifecycle."""
-    global _bot_application
+    global _bot_application, _auto_number_caller
 
     configure_logging()
     logger.info("AMHABINGO Bot starting up", environment=settings.ENVIRONMENT)
@@ -54,10 +55,45 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await _bot_application.start()
     logger.info("Bot application started")
 
+    # Start automatic number caller for bingo games
+    try:
+        from backend.services.auto_number_caller_service import get_auto_caller
+        from backend.services.game_engine_service import GameEngineService
+        from backend.repositories.bingo_game_repository import BingoGameRepository
+        from backend.repositories.game_player_repository import GamePlayerRepository
+        from backend.repositories.cartela_repository import CartelaRepository
+        from backend.repositories.called_number_repository import CalledNumberRepository
+        from backend.repositories.game_event_repository import GameEventRepository
+        from backend.services.redis_game_state_service import RedisGameStateService
+        
+        # Create game engine instance
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            game_engine = GameEngineService(
+                bingo_game_repo=BingoGameRepository(session),
+                game_player_repo=GamePlayerRepository(session),
+                cartela_repo=CartelaRepository(session),
+                called_number_repo=CalledNumberRepository(session),
+                game_event_repo=GameEventRepository(session),
+                redis_service=RedisGameStateService(),
+            )
+            
+            _auto_number_caller = get_auto_caller()
+            _auto_number_caller.start(game_engine)
+            logger.info("Automatic number caller started")
+    except Exception as e:
+        logger.error(f"Failed to start automatic number caller: {e}", exc_info=True)
+
     yield
 
     # Shutdown
     logger.info("Shutting down...")
+    
+    # Stop automatic number caller
+    if _auto_number_caller:
+        _auto_number_caller.stop()
+        logger.info("Automatic number caller stopped")
+    
     if _bot_application:
         await _bot_application.stop()
         await _bot_application.shutdown()

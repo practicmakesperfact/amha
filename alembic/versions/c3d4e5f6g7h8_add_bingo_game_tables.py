@@ -17,23 +17,50 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enums
-    gamestatus_enum = postgresql.ENUM('WAITING', 'STARTING', 'PLAYING', 'PAUSED', 'FINISHED', 'CANCELLED', name='gamestatus', create_type=False)
-    gamestatus_enum.create(op.get_bind(), checkfirst=True)
+    # Create enums using DO block to check if they exist (PostgreSQL 9.3+)
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'gamestatus') THEN
+                CREATE TYPE gamestatus AS ENUM ('WAITING', 'STARTING', 'PLAYING', 'PAUSED', 'FINISHED', 'CANCELLED');
+            END IF;
+        END
+        $$;
+    """)
     
-    playerstatus_enum = postgresql.ENUM('JOINED', 'ACTIVE', 'DISCONNECTED', 'LEFT', 'WINNER', name='playerstatus', create_type=False)
-    playerstatus_enum.create(op.get_bind(), checkfirst=True)
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'playerstatus') THEN
+                CREATE TYPE playerstatus AS ENUM ('JOINED', 'ACTIVE', 'DISCONNECTED', 'LEFT', 'WINNER');
+            END IF;
+        END
+        $$;
+    """)
     
-    gameeventtype_enum = postgresql.ENUM(
-        'GAME_CREATED', 'PLAYER_JOINED', 'PLAYER_LEFT', 'GAME_STARTING', 'GAME_STARTED',
-        'NUMBER_CALLED', 'GAME_PAUSED', 'GAME_RESUMED', 'WINNER_DECLARED', 'PRIZE_PAID',
-        'GAME_FINISHED', 'GAME_CANCELLED', 'REFUND_ISSUED',
-        name='gameeventtype', create_type=False
-    )
-    gameeventtype_enum.create(op.get_bind(), checkfirst=True)
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'gameeventtype') THEN
+                CREATE TYPE gameeventtype AS ENUM (
+                    'GAME_CREATED', 'PLAYER_JOINED', 'PLAYER_LEFT', 'GAME_STARTING', 'GAME_STARTED',
+                    'NUMBER_CALLED', 'GAME_PAUSED', 'GAME_RESUMED', 'WINNER_DECLARED', 'PRIZE_PAID',
+                    'GAME_FINISHED', 'GAME_CANCELLED', 'REFUND_ISSUED'
+                );
+            END IF;
+        END
+        $$;
+    """)
     
-    winpattern_enum = postgresql.ENUM('ROW', 'COLUMN', 'DIAGONAL', 'FULL_CARD', name='winpattern', create_type=False)
-    winpattern_enum.create(op.get_bind(), checkfirst=True)
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'winpattern') THEN
+                CREATE TYPE winpattern AS ENUM ('ROW', 'COLUMN', 'DIAGONAL', 'FULL_CARD');
+            END IF;
+        END
+        $$;
+    """)
 
     # BingoGame table
     op.create_table(
@@ -44,7 +71,7 @@ def upgrade() -> None:
         sa.Column('prize_pool', sa.Float(), nullable=False),
         sa.Column('max_players', sa.Integer(), nullable=False),
         sa.Column('min_players', sa.Integer(), nullable=False),
-        sa.Column('status', sa.Enum('WAITING', 'STARTING', 'PLAYING', 'PAUSED', 'FINISHED', 'CANCELLED', name='gamestatus'), nullable=False),
+        sa.Column('status', postgresql.ENUM('WAITING', 'STARTING', 'PLAYING', 'PAUSED', 'FINISHED', 'CANCELLED', name='gamestatus', create_type=False), nullable=False),
         sa.Column('current_number', sa.Integer(), nullable=True),
         sa.Column('numbers_called_count', sa.Integer(), nullable=False),
         sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
@@ -92,10 +119,10 @@ def upgrade() -> None:
         sa.Column('cartela_id', sa.Integer(), nullable=True),
         sa.Column('entry_fee', sa.Float(), nullable=False),
         sa.Column('prize_amount', sa.Float(), nullable=False),
-        sa.Column('status', sa.Enum('JOINED', 'ACTIVE', 'DISCONNECTED', 'LEFT', 'WINNER', name='playerstatus'), nullable=False),
+        sa.Column('status', postgresql.ENUM('JOINED', 'ACTIVE', 'DISCONNECTED', 'LEFT', 'WINNER', name='playerstatus', create_type=False), nullable=False),
         sa.Column('is_winner', sa.Boolean(), nullable=False),
         sa.Column('winning_position', sa.Integer(), nullable=True),
-        sa.Column('win_pattern', sa.Enum('ROW', 'COLUMN', 'DIAGONAL', 'FULL_CARD', name='winpattern'), nullable=True),
+        sa.Column('win_pattern', postgresql.ENUM('ROW', 'COLUMN', 'DIAGONAL', 'FULL_CARD', name='winpattern', create_type=False), nullable=True),
         sa.Column('marked_numbers', sa.Text(), nullable=True),
         sa.Column('joined_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('left_at', sa.DateTime(timezone=True), nullable=True),
@@ -134,11 +161,11 @@ def upgrade() -> None:
         'game_events',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
         sa.Column('game_id', sa.Integer(), nullable=False),
-        sa.Column('event_type', sa.Enum(
+        sa.Column('event_type', postgresql.ENUM(
             'GAME_CREATED', 'PLAYER_JOINED', 'PLAYER_LEFT', 'GAME_STARTING', 'GAME_STARTED',
             'NUMBER_CALLED', 'GAME_PAUSED', 'GAME_RESUMED', 'WINNER_DECLARED', 'PRIZE_PAID',
             'GAME_FINISHED', 'GAME_CANCELLED', 'REFUND_ISSUED',
-            name='gameeventtype'
+            name='gameeventtype', create_type=False
         ), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=True),
         sa.Column('player_id', sa.Integer(), nullable=True),

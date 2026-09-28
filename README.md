@@ -28,6 +28,39 @@
 
 ## ✨ Features
 
+### Phase 1 - Financial System ✅
+- ✅ User registration with Telegram contact sharing
+- ✅ Auto-approved deposits (Telebirr SMS verification)
+- ✅ Admin-approved withdrawals
+- ✅ Instant peer-to-peer transfers
+- ✅ Multi-wallet system (main_wallet, play_wallet, coin, wins)
+- ✅ Complete financial ledger (WalletTransaction)
+- ✅ System-wide audit trail (AuditLog)
+- ✅ Admin REST API with header-based authentication
+- ✅ Rate limiting and security features
+- ✅ Docker deployment ready
+
+### Phase 2A - Bingo Game Backend ✅ (NEW!)
+- ✅ Standard 75-ball Bingo game engine
+- ✅ Server-authoritative game logic (anti-cheat)
+- ✅ Cartela generator (B-I-N-G-O columns, FREE center)
+- ✅ Winner validation (row, column, diagonal, full card)
+- ✅ Real-time WebSocket communication
+- ✅ Redis state management
+- ✅ Prize distribution system (1st/2nd/3rd place)
+- ✅ Game lifecycle management (create, join, start, pause, finish, cancel)
+- ✅ Player statistics and game history
+- ✅ Complete REST API (player + admin endpoints)
+- ✅ Refund system for cancelled games
+- ✅ Concurrent operation safety (row locking)
+- ✅ Full audit trail integration
+
+### Phase 2B - Mini App Frontend ⚠️ (COMING NEXT)
+- ⏳ Next.js Telegram Mini App
+- ⏳ Real-time game UI with WebSocket
+- ⏳ Interactive Bingo cartela
+- ⏳ Admin dashboard
+
 ### User Features
 - 🎮 **Interactive Menu** - Persistent keyboard with all features
 - 📝 **Easy Registration** - One-tap contact sharing
