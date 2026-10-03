@@ -18,6 +18,13 @@ from backend.handlers.register_handler import contact_handler
 from backend.handlers.start_handler import start_handler
 from backend.handlers.admin_handler import admin_callback_handler
 from backend.handlers.bingo_handler import bingo_callback_handler
+from backend.handlers.admin_game_handler import (
+    admin_create_game_handler,
+    admin_start_game_handler,
+    admin_cancel_game_handler,
+    admin_list_games_handler,
+    admin_game_stats_handler,
+)
 
 logger = get_logger(__name__)
 
@@ -55,6 +62,13 @@ def build_application() -> Application:
 
     # ── Command handlers ───────────────────────────────────────────────────
     application.add_handler(CommandHandler("start", start_handler))
+    
+    # ── Admin game management commands ─────────────────────────────────────
+    application.add_handler(CommandHandler("admin_create_game", admin_create_game_handler))
+    application.add_handler(CommandHandler("admin_start_game", admin_start_game_handler))
+    application.add_handler(CommandHandler("admin_cancel_game", admin_cancel_game_handler))
+    application.add_handler(CommandHandler("admin_list_games", admin_list_games_handler))
+    application.add_handler(CommandHandler("admin_stats", admin_game_stats_handler))
 
     # ── Contact handler (for registration) ────────────────────────────────
     application.add_handler(
