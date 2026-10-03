@@ -15,10 +15,12 @@
     "react-dom": "^18.3.0",
     "@tanstack/react-query": "^5.28.0",
     "@telegram-apps/sdk-react": "^1.0.0",
+    "axios": "^1.6.0",
     "zod": "^3.22.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.0"
+    "tailwind-merge": "^2.2.0",
+    "lucide-react": "^0.index363.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
