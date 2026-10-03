@@ -14,12 +14,21 @@ class ApiClient {
       timeout: 30000,
     })
 
-    // Request interceptor - add auth token
+    // Request interceptor - add auth token or admin ID
     this.client.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem('auth_token')
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`
+        // Check if this is an admin request
+        if (config.url?.startsWith('/admin')) {
+          const adminId = localStorage.getItem('admin_id')
+          if (adminId) {
+            config.headers['X-Admin-Id'] = adminId
+          }
+        } else {
+          // Regular user authentication
+          const token = localStorage.getItem('auth_token')
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`
+          }
         }
         return config
       },

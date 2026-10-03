@@ -1,0 +1,110 @@
+===============================================
+AMHABINGO - SECURITY FIX INSTRUCTIONS
+===============================================
+
+GitHub detected your Telegram Bot Token in LAUNCH_GUIDE.md!
+
+IMMEDIATE ACTIONS REQUIRED:
+===============================================
+
+1. REVOKE THE EXPOSED TOKEN (CRITICAL!)
+   -----------------------------------------
+   a. Open Telegram and find @BotFather
+   b. Send: /mybots
+   c. Select: amhabingo_bot
+   d. Click: API Token
+   e. Click: Revoke current token
+   f. Click: Yes, I'm sure
+   
+   ⚠️  The old token (8724658540:AAFQkvFuHM1KdkazV7Ob1o43ABuxb0FTRQ0) 
+       is now INVALID and cannot be used.
+
+2. GENERATE NEW TOKEN
+   -----------------------------------------
+   a. Still in BotFather chat
+   b. Your bot should still be selected
+   c. Click: API Token
+   d. Click: Generate new token
+   e. Copy the NEW token
+
+3. UPDATE YOUR .ENV FILE
+   -----------------------------------------
+   a. Open: .env (in your project root)
+   b. Find line: TELEGRAM_BOT_TOKEN=8724658540:...
+   c. Replace with: TELEGRAM_BOT_TOKEN=YOUR_NEW_TOKEN_HERE
+   d. Save the file
+
+4. CLEAN UP GIT HISTORY
+   -----------------------------------------
+   Run the cleanup script:
+   
+   Windows:
+   --------
+   cleanup_sensitive_files.bat
+
+   Linux/Mac:
+   ----------
+   chmod +x cleanup_sensitive_files.sh
+   ./cleanup_sensitive_files.sh
+
+5. PUSH CHANGES TO GITHUB
+   -----------------------------------------
+   git push origin main
+
+===============================================
+WHAT WE FIXED:
+===============================================
+
+✅ Updated .gitignore to exclude all .md files (except README.md)
+✅ Deleted LAUNCH_GUIDE.md (contained the token)
+✅ Created cleanup scripts to remove files from git tracking
+✅ This file (SECURITY_FIX_INSTRUCTIONS.txt) will also be ignored
+
+===============================================
+WHY THIS HAPPENED:
+===============================================
+
+Documentation files (*.md) contained:
+- Database passwords
+- API endpoints
+- Telegram bot token
+- Admin credentials
+- Phone numbers
+
+These should NEVER be committed to public repositories!
+
+===============================================
+PREVENTION:
+===============================================
+
+From now on:
+✅ All .md files (except README.md) are gitignored
+✅ Only .env.example is committed (not .env)
+✅ Sensitive data stays local only
+
+===============================================
+VERIFY THE FIX:
+===============================================
+
+After running the cleanup script:
+
+1. Check git status:
+   git status
+
+2. You should see .md files as "untracked" (not staged)
+
+3. Push to GitHub:
+   git push origin main
+
+4. Verify on GitHub that .md files are gone (except README.md)
+
+===============================================
+NEED HELP?
+===============================================
+
+If you have questions:
+1. Check GitHub's security alerts page
+2. Verify the old token is revoked in BotFather
+3. Test your bot with the new token: python run_bot.py
+
+===============================================

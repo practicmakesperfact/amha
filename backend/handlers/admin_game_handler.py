@@ -291,76 +291,77 @@ async def admin_list_games_handler(update: Update, context: ContextTypes.DEFAULT
 
     tg_user = update.effective_user
     
-    # Check if user is admin
-    factory = get_session_factory()
-    async with factory() as session:
-        user_service = UserService(session)
-        user = await user_service.get_by_telegram_id(tg_user.id)
-        
-        if not user or not user.is_admin:
+    try:
+        # Check if user is admin
+        factory = get_session_factory()
+        async with factory() as session:
+            user_service = UserService(session)
+            user = await user_service.get_by_telegram_id(tg_user.id)
+            
+            if not user or not user.is_admin:
+                await update.effective_message.reply_text(
+                    "❌ Access denied. Admin only.",
+                    parse_mode="HTML",
+                )
+                return
+
+            # Get games
+            game_repo = BingoGameRepository(session)
+            waiting_games = await game_repo.get_waiting_games(skip=0, limit=10)
+            active_games = await game_repo.get_active_games(skip=0, limit=10)
+            finished_games = await game_repo.get_finished_games(skip=0, limit=5)
+
+            msg = "🎮 <b>GAME MANAGEMENT</b>\n\n"
+
+            if waiting_games:
+                msg += "⏳ <b>Waiting to Start:</b>\n"
+                for game in waiting_games:
+                    player_repo = GamePlayerRepository(session)
+                    player_count = await player_repo.get_active_players_count(game.id)
+                    msg += (
+                        f"  • Game #{game.game_number} (ID: {game.id})\n"
+                        f"    Entry: {game.entry_fee} Birr\n"
+                        f"    Prize: {game.prize_pool} Birr\n"
+                        f"    Players: {player_count}/{game.max_players} "
+                        f"(min: {game.min_players})\n"
+                    )
+                    if player_count >= game.min_players:
+                        msg += f"    ✅ Ready to start!\n"
+                    msg += "\n"
+
+            if active_games:
+                msg += "🎲 <b>In Progress:</b>\n"
+                for game in active_games:
+                    player_repo = GamePlayerRepository(session)
+                    player_count = await player_repo.get_active_players_count(game.id)
+                    msg += (
+                        f"  • Game #{game.game_number} (ID: {game.id})\n"
+                        f"    Status: {game.status.value}\n"
+                        f"    Prize: {game.prize_pool} Birr\n"
+                        f"    Players: {player_count}\n\n"
+                    )
+
+            if finished_games:
+                msg += "🏁 <b>Recently Finished:</b>\n"
+                for game in finished_games[:3]:
+                    msg += (
+                        f"  • Game #{game.game_number} - "
+                        f"{game.prize_pool} Birr\n"
+                    )
+
+            if not waiting_games and not active_games and not finished_games:
+                msg += "No games found.\n\n"
+
+            msg += "\n<b>Commands:</b>\n"
+            msg += "<code>/admin_create_game 10 50 2</code>\n"
+            msg += "<code>/admin_start_game &lt;id&gt;</code>\n"
+            msg += "<code>/admin_cancel_game &lt;id&gt;</code>"
+
             await update.effective_message.reply_text(
-                "❌ Access denied. Admin only.",
+                msg,
                 parse_mode="HTML",
+                reply_markup=main_menu_keyboard(),
             )
-            return
-
-        # Get games
-        game_repo = BingoGameRepository(session)
-        waiting_games = await game_repo.get_waiting_games(skip=0, limit=10)
-        active_games = await game_repo.get_active_games(skip=0, limit=10)
-        finished_games = await game_repo.get_finished_games(skip=0, limit=5)
-
-        msg = "🎮 <b>GAME MANAGEMENT</b>\n\n"
-
-        if waiting_games:
-            msg += "⏳ <b>Waiting to Start:</b>\n"
-            for game in waiting_games:
-                player_repo = GamePlayerRepository(session)
-                player_count = await player_repo.get_active_players_count(game.id)
-                msg += (
-                    f"  • Game #{game.game_number} (ID: {game.id})\n"
-                    f"    Entry: {game.entry_fee} Birr\n"
-                    f"    Prize: {game.prize_pool} Birr\n"
-                    f"    Players: {player_count}/{game.max_players} "
-                    f"(min: {game.min_players})\n"
-                )
-                if player_count >= game.min_players:
-                    msg += f"    ✅ Ready to start!\n"
-                msg += "\n"
-
-        if active_games:
-            msg += "🎲 <b>In Progress:</b>\n"
-            for game in active_games:
-                player_repo = GamePlayerRepository(session)
-                player_count = await player_repo.get_active_players_count(game.id)
-                msg += (
-                    f"  • Game #{game.game_number} (ID: {game.id})\n"
-                    f"    Status: {game.status.value}\n"
-                    f"    Prize: {game.prize_pool} Birr\n"
-                    f"    Players: {player_count}\n\n"
-                )
-
-        if finished_games:
-            msg += "🏁 <b>Recently Finished:</b>\n"
-            for game in finished_games[:3]:
-                msg += (
-                    f"  • Game #{game.game_number} - "
-                    f"{game.prize_pool} Birr\n"
-                )
-
-        if not waiting_games and not active_games and not finished_games:
-            msg += "No games found.\n\n"
-
-        msg += "\n<b>Commands:</b>\n"
-        msg += "<code>/admin_create_game 10 50 2</code>\n"
-        msg += "<code>/admin_start_game &lt;id&gt;</code>\n"
-        msg += "<code>/admin_cancel_game &lt;id&gt;</code>"
-
-        await update.effective_message.reply_text(
-            msg,
-            parse_mode="HTML",
-            reply_markup=main_menu_keyboard(),
-        )
 
     except Exception:
         logger.exception("Error listing games", admin_id=tg_user.id)

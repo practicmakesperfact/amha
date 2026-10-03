@@ -134,6 +134,11 @@ export const adminApi = {
     return response.data
   },
 
+  getGame: async (gameId: number) => {
+    const response = await apiClient.get<BingoGame>(`/admin/games/${gameId}`)
+    return response.data
+  },
+
   createGame: async (data: {
     entry_fee: number
     max_players: number
